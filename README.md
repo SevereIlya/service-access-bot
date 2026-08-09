@@ -1,82 +1,67 @@
-# Telegram Bot Backend
+# Telegram Subscription Management Backend
 
 A production-grade, highly scalable asynchronous backend for Telegram bots built with Rust.
 
-This repository serves as a portfolio showcase of advanced software engineering patterns. It demonstrates how to build robust, maintainable, and strictly typed systems using modern architectural principles.
+This repository serves as a portfolio showcase of advanced software engineering patterns. It demonstrates how to build robust, maintainable, and strictly typed systems using modern architectural principles, avoiding the common pitfalls of tight coupling and anemic domain models.
 
-*Note: This is the "Core" version of the project. Proprietary business logic, specific billing integrations, and marketing UI copies have been replaced with generic stubs or mocked adapters to protect commercial interests.*
+*Note: Proprietary business logic and specific integrations have been abstracted into generic interfaces to protect commercial interests, while the core architectural skeleton remains fully intact.*
 
-## Architectural Highlights
+## Architectural Overview
 
-This project strictly adheres to **Clean Architecture** and **Domain-Driven Design (DDD)** principles, ensuring a complete decoupling of business logic from infrastructure and delivery mechanisms.
-
-* **Domain-Driven Design (DDD):** Rich domain model encapsulation. Business rules (e.g., trial eligibility, discount calculations) are enforced within Domain Entities (`User`, `Subscription`), not in application services. Extensive use of the Newtype pattern (`UserId`, `TelegramId`, `Money`) prevents logic errors at compile time.
-* **CQRS (Command and Query Responsibility Segregation):** Application logic is divided into isolated `Commands` (state-mutating operations) and `Queries` (read-only operations), eliminating bloated "God Objects" or God Services.
-* **Unit of Work (UoW) Pattern:** Custom UoW implementation using `tokio::sync::Mutex` and `sqlx::Transaction`. It guarantees atomic operations and transactional consistency across multiple PostgreSQL repositories.
-* **Dependency Injection:** Infrastructure layers (Database, Telegram API) are decoupled from the core logic using Rust's dynamic trait objects (`dyn Trait`), making the business logic 100% testable without requiring a live database connection.
-* **Isolated Error Handling:** Strict separation between Domain errors (business rule violations) and Application errors (system/infrastructure failures), utilizing the `thiserror` crate for clean error mapping.
-
-## Technology Stack
-
-* **Language:** Rust
-* **Async Runtime:** Tokio
-* **Database:** PostgreSQL
-* **Database Toolkit:** SQLx (Raw SQL macros for zero-cost abstraction and compile-time query verification)
-* **Telegram Framework:** Teloxide
-* **Configuration:** Config (TOML based), dotenv
-
-## Project Structure
-
-The codebase is organized into four primary layers, with dependencies strictly pointing inward toward the Domain.
+This project strictly adheres to **Clean Architecture** and **Domain-Driven Design (DDD)** principles. The codebase is organized into four distinct layers, with dependencies strictly pointing inward toward the Domain.
 
 ```text
 src/
-├── adapters/       # Delivery mechanisms: Telegram framework integration, routing, handlers, and UI views.
-├── application/    # Orchestration layer: Use cases (Commands/Queries) and application-level error definitions.
-├── domain/         # Core business logic: Entities, Value Objects, Domain Errors, and Repository/UoW interfaces.
-└── infrastructure/ # External concerns: PostgreSQL connections, SQLx implementations, and configuration parsers.
+├── adapters/       # Delivery mechanisms: Telegram framework integration, UI views, routing.
+├── application/    # Orchestration layer: Use cases (Commands/Queries) and transaction boundaries.
+├── domain/         # Core business logic: Entities, Value Objects, Domain Errors.
+└── infrastructure/ # External concerns: PostgreSQL connections, SQLx, Configuration, DI Container.
 ```
 
-## Getting Started
+## Core Engineering Patterns
 
-### Prerequisites
+### 1. Domain-Driven Design (DDD)
+*   **Rich Domain Models:** Business rules (e.g., trial eligibility, discount processing) are encapsulated directly within Domain Entities (`User`, `Subscription`). State mutation is strictly controlled via domain methods; properties are private to prevent invalid states.
+*   **Value Objects (Newtype Pattern):** Extensive use of domain primitives (`UserId`, `TelegramId`, `Money`, `SubscriptionPlan`) to leverage Rust's type system, preventing logic errors and invalid comparisons at compile time.
+*   **Reconstitution Pattern:** Entities utilize isolated `restore_from_db` constructors used strictly by the Infrastructure layer mapping, ensuring business invariants are not bypassed during data retrieval.
 
-* Rust (latest stable toolchain)
-* PostgreSQL database
+### 2. CQRS (Command and Query Responsibility Segregation)
+Application logic is divided into isolated `Commands` (state-mutating operations) and `Queries` (read-only operations). This eliminates bloated service classes and allows independent scaling and testing of read and write paths.
 
-### Configuration
+### 3. Unit of Work (UoW)
+A custom UoW implementation manages transaction boundaries across multiple PostgreSQL repositories. By abstracting `sqlx::Transaction` behind a `tokio::sync::Mutex`, the Domain and Application layers can execute atomic operations safely in an asynchronous environment without being coupled to the underlying database driver.
 
-1. Clone the repository:
-   ```bash
-   git clone <repository_url>
-   cd enterprise-bot-core
-   ```
+### 4. Advanced Database Design
+*   **Internal vs. External Keys:** The database utilizes `BIGINT` identity columns as Primary Keys for highly optimized internal joins, while exposing `UUID` (External IDs) for secure API integrations and third-party interactions.
+*   **Slowly Changing Dimensions (SCD):** Financial integrity is guaranteed by snapshotting base prices (`frozen_base_price`) at the time of user registration, ensuring historical data remains consistent regardless of future pricing changes.
+*   **Zero-Cost Compile-Time Queries:** Heavy reliance on `sqlx` macros ensures that all SQL queries are verified against the active database schema during compilation.
 
-2. Set up environment variables:
-   Copy `.env.example` to `.env` and provide your database URL.
-   ```bash
-   cp .env.example .env
-   ```
+### 5. Observability & Structured Logging
+The project implements rigorous structured logging using the `tracing` crate. Logs are strictly separated by severity levels. `#[instrument]` macros are used at the Adapter layer to automatically inject user context (e.g., `telegram_id`) into the span, ensuring complete request traceability across all application layers without polluting the domain logic.
 
-3. Set up the application configuration:
-   Copy `config.example.toml` to `config.toml` and fill in the required parameters (Telegram token, database URL, etc.).
-   ```bash
-   cp config.example.toml config.toml
-   ```
+### 6. Dependency Injection
+Infrastructure layers (Repositories, UoW) are instantiated in a central Composition Root (`AppState` container) and injected into the Application layer via `Arc`. This ensures the business logic remains 100% testable using mock repositories without requiring a live database connection.
 
-### Running the Application
+## Technology Stack
 
-To compile and run the bot in development mode:
+*   **Language:** Rust (Stable)
+*   **Async Runtime:** Tokio
+*   **Database:** PostgreSQL
+*   **Database Toolkit:** SQLx
+*   **Telegram Framework:** Teloxide
+*   **Observability:** Tracing, Tracing-Subscriber
+*   **Configuration:** Config (TOML based)
 
-```bash
-cargo run
-```
+## Local Development
 
-To run the test suite (Domain unit tests and Use Case retry-logic tests):
+While this repository acts primarily as a codebase showcase, it is fully functional.
 
-```bash
-cargo test
-```
+To run the environment locally:
+1. Provide a PostgreSQL database and a Telegram Bot token.
+2. Copy `.env.example` to `.env`, `config.example.toml` to `config.toml` and `en.example.toml` to `en.toml`
+3. Apply database migrations: `cargo sqlx migrate run`.
+4. Run the test suite: `cargo test`.
+5. Start the backend: `cargo run`.
 
 ## License
 
