@@ -1,0 +1,11 @@
+# Секреты
+/.env
+/config.toml
+
+# Папки
+/.idea/
+/locales/ru.toml
+/notes/
+/target/
+
+# Прочие файлы

@@ -1,0 +1,23 @@
+[message]
+msg_start_message = "Welcome"
+msg_trial_success_view = "Trial has been successfully issued"
+msg_main_menu_view = "Main menu"
+msg_refresh_menu_view = "Main menu refreshed"
+msg_unknown_command = "️Send /start"
+
+[button]
+btn_menu_trial = "Use trial"
+btn_menu_main = "Main menu"
+btn_menu_router = "Router"
+btn_menu_profile = "My profile"
+btn_menu_tariffs = "My tariffs"
+btn_menu_referral = "My referrals"
+btn_menu_help = "Help"
+btn_menu_down = "Down"
+
+[error]
+err_user_not_found = "User not found"
+err_trial_used = "Trial used"
+err_has_sub = "Has sub"
+err_system_failure = "System failure"
+err_internal = "Internal"
