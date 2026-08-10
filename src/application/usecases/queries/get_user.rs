@@ -11,7 +11,7 @@ impl GetUserQuery {
     }
 
     pub async fn execute(&self, telegram_id: i64) -> AppResult<Option<User>> {
-        let user = self.user_repo.find_by_telegram_id(TelegramId(telegram_id)).await?;
+        let user = self.user_repo.find_by_telegram_id(TelegramId::new(telegram_id)).await?;
         Ok(user)
     }
 }

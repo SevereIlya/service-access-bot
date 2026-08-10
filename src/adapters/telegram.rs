@@ -1,18 +1,15 @@
-use crate::application::usecases::commands::register_user::RegisterUserCommand;
-use crate::application::usecases::commands::start_trial::StartTrialCommand;
-use crate::application::usecases::queries::get_menu_state::GetMenuStateQuery;
-use crate::application::usecases::queries::get_user::GetUserQuery;
+use crate::adapters::telegram::ui::UiText;
+use crate::application::usecases::UseCases;
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
-use crate::adapters::telegram::ui::UiText;
 
 pub mod callbacks;
 pub mod commands;
 pub mod error;
 pub mod handlers;
 pub mod router;
-pub mod views;
 pub mod ui;
+pub mod views;
 
 #[derive(Clone, Debug)]
 pub enum UserState {
@@ -23,11 +20,7 @@ pub enum UserState {
 
 #[derive(Clone)]
 pub struct BotState {
-    // Юзкейсы
-    pub register_user_cmd: Arc<RegisterUserCommand>,
-    pub start_trial_cmd: Arc<StartTrialCommand>,
-    pub get_user_query: Arc<GetUserQuery>,
-    pub get_menu_state_query: Arc<GetMenuStateQuery>,
+    pub usecases: Arc<UseCases>,
 
     // UI-состояние Телеграма
     pub bot_username: String,

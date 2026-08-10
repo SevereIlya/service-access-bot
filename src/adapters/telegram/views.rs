@@ -2,6 +2,8 @@ use crate::adapters::telegram::handlers::MessageView;
 use crate::adapters::telegram::ui::UiText;
 use crate::application::error::AppError;
 use crate::domain::error::DomainError;
+use crate::domain::error::SubscriptionError::AlreadyHasActive;
+use crate::domain::error::UserError::{NotFound, TrialAlreadyUsed};
 use chrono::{DateTime, FixedOffset, Utc};
 use teloxide::types::{InlineKeyboardButton, InlineKeyboardMarkup};
 
@@ -37,7 +39,6 @@ pub fn build_start_message(ui: &UiText, can_trial: bool) -> MessageView {
 #[must_use]
 #[allow(clippy::missing_panics_doc)]
 pub fn build_trial_success_view(ui: &UiText, expires_at: DateTime<Utc>) -> MessageView {
-
     let msk_offset = FixedOffset::east_opt(3 * 3600)
         .expect("Hardcoded offset of +3 hours is mathematically always valid");
 
@@ -83,9 +84,9 @@ fn build_menu_keyboard(ui: &UiText, can_trial: bool) -> InlineKeyboardMarkup {
 
     if can_trial {
         rows.push(vec![InlineKeyboardButton::callback(
-                ui.button.btn_menu_trial.clone(),
-                "menu:trial",
-            )]);
+            ui.button.btn_menu_trial.clone(),
+            "menu:trial",
+        )]);
     }
 
     rows.extend([
@@ -126,9 +127,9 @@ fn build_menu_keyboard(ui: &UiText, can_trial: bool) -> InlineKeyboardMarkup {
 pub fn message_error(ui: &UiText, err: &AppError) -> String {
     match err {
         AppError::Domain(domain_err) => match domain_err {
-            DomainError::UserNotFound => ui.error.err_user_not_found.clone(),
-            DomainError::TrialAlreadyUsed => ui.error.err_trial_used.clone(),
-            DomainError::AlreadyHasSubscription => ui.error.err_has_sub.clone(),
+            DomainError::User(NotFound) => ui.error.err_user_not_found.clone(),
+            DomainError::User(TrialAlreadyUsed) => ui.error.err_trial_used.clone(),
+            DomainError::Subscription(AlreadyHasActive) => ui.error.err_has_sub.clone(),
             DomainError::SystemFailure(_) => ui.error.err_system_failure.clone(),
             _ => ui.error.err_internal.clone(),
         },

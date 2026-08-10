@@ -1,4 +1,4 @@
-use crate::domain::error::{DomainError, DomainResult};
+use crate::domain::error::{DomainError, DomainResult, UserError};
 use crate::domain::user::{
     DiscountPercent, Money, ReferralCode, SubscriptionToken, TelegramId, UserId, UserRole,
 };
@@ -151,10 +151,10 @@ impl User {
 
     pub fn use_trial(&mut self) -> DomainResult<()> {
         if self.trial_used {
-            return Err(DomainError::TrialAlreadyUsed);
+            return Err(DomainError::User(UserError::TrialAlreadyUsed));
         }
         self.trial_used = true;
-        self.discount_percent = DiscountPercent::new(15);
+        self.discount_percent = DiscountPercent::new(15)?;
         Ok(())
     }
 
@@ -178,13 +178,13 @@ mod tests {
 
     fn create_base_user() -> User {
         User::new(
-            TelegramId(123456789),
+            TelegramId::new(123456789),
             Uuid::new_v4(),
             Some("freddie".to_string()),
             "Freddie Mercury".to_string(),
-            Money(20000),
-            ReferralCode("MY_REF_123".to_string()),
-            SubscriptionToken("TOKEN_XYZ".to_string()),
+            Money::new(20000).unwrap(),
+            ReferralCode::new("MY_REF_123".to_string()),
+            SubscriptionToken::new("TOKEN_XYZ".to_string()),
         )
     }
 
@@ -196,15 +196,18 @@ mod tests {
     fn test_user_new_creates_valid_default_user() {
         let user = create_base_user();
         assert_eq!(user.id, None);
-        assert_eq!(user.telegram_id, TelegramId(123456789));
+        assert_eq!(user.telegram_id, TelegramId::new(123456789));
         assert_eq!(user.username, Some("freddie".to_string()));
         assert_eq!(user.full_name, "Freddie Mercury".to_string());
         assert_eq!(user.role, UserRole::User);
-        assert_eq!(user.frozen_base_price, Money(20000));
-        assert_eq!(user.referral_code, ReferralCode("MY_REF_123".to_string()));
+        assert_eq!(user.frozen_base_price, Money::new(20000).unwrap());
+        assert_eq!(
+            user.referral_code,
+            ReferralCode::new("MY_REF_123".to_string())
+        );
         assert_eq!(
             user.subscription_token,
-            SubscriptionToken("TOKEN_XYZ".to_string())
+            SubscriptionToken::new("TOKEN_XYZ".to_string())
         );
         assert_eq!(user.trial_used, false);
         assert_eq!(user.discount_percent, DiscountPercent::zero());
@@ -220,7 +223,7 @@ mod tests {
 
         assert!(result.is_ok());
         assert_eq!(user.trial_used, true);
-        assert_eq!(user.discount_percent, DiscountPercent::new(15));
+        assert_eq!(user.discount_percent, DiscountPercent::new(15).unwrap());
     }
 
     #[test]
@@ -232,7 +235,10 @@ mod tests {
         let result = user.use_trial();
 
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), DomainError::TrialAlreadyUsed));
+        assert!(matches!(
+            result.unwrap_err(),
+            DomainError::User(UserError::TrialAlreadyUsed)
+        ));
     }
 
     #[test]

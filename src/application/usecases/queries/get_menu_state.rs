@@ -1,5 +1,6 @@
 use crate::application::error::AppResult;
 use crate::domain::error::DomainError;
+use crate::domain::error::UserError::EntityNotSaved;
 use crate::domain::subscription::DynSubscriptionRepository;
 use crate::domain::user::User;
 
@@ -21,7 +22,7 @@ impl GetMenuStateQuery {
             return Ok(MenuState { can_trial: false });
         }
 
-        let id = user.id().ok_or(DomainError::EntityNotSaved)?;
+        let id = user.id().ok_or(DomainError::User(EntityNotSaved))?;
         let has_active_sub =
             self.sub_repo.find_active_by_user_id(id).await?.is_some();
 

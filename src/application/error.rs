@@ -8,15 +8,6 @@ pub enum AppError {
     #[error(transparent)]
     Domain(#[from] DomainError),
 
-    #[error("Database error: {0}")]
-    Database(#[from] sqlx::Error),
-
-    #[error("Configuration error: {0}")]
-    Config(#[from] config::ConfigError),
-
-    #[error("Transaction failed: {0}")]
-    Transaction(String),
-
     #[error("Max retries exceeded: {0}")]
     MaxRetriesExceeded(String),
 

@@ -1,9 +1,8 @@
-use crate::domain::error::DomainError;
+use crate::domain::error::{DomainError, SubscriptionError};
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct SubscriptionId(pub i64);
+pub struct SubscriptionId(i64);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SubscriptionPlan {
@@ -22,17 +21,23 @@ pub enum SubscriptionStatus {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct SubscriptionDevices(pub i32);
+pub struct SubscriptionDevices(i32);
 
 // =============================================================================================
 
-impl Display for SubscriptionId {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
+impl SubscriptionId {
+    #[must_use]
+    pub const fn new(id: i64) -> Self {
+        Self(id)
+    }
+
+    #[must_use]
+    pub const fn inner(&self) -> i64 {
+        self.0
     }
 }
 
-impl Display for SubscriptionDevices {
+impl Display for SubscriptionId {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
     }
@@ -61,7 +66,7 @@ impl FromStr for SubscriptionPlan {
             "month_3" => Ok(Self::Month3),
             "month_6" => Ok(Self::Month6),
             "month_12" => Ok(Self::Month12),
-            _ => Err(DomainError::InvalidPlan(s.to_string())),
+            _ => Err(SubscriptionError::InvalidPlan(s.to_string()).into()),
         }
     }
 }
@@ -85,7 +90,25 @@ impl FromStr for SubscriptionStatus {
             "active" => Ok(Self::Active),
             "inactive" => Ok(Self::Inactive),
             "canceled" => Ok(Self::Canceled),
-            _ => Err(DomainError::InvalidStatus(s.to_string())),
+            _ => Err(SubscriptionError::InvalidStatus(s.to_string()).into()),
         }
+    }
+}
+
+impl SubscriptionDevices {
+    #[must_use]
+    pub const fn new(id: i32) -> Self {
+        Self(id)
+    }
+
+    #[must_use]
+    pub const fn inner(&self) -> i32 {
+        self.0
+    }
+}
+
+impl Display for SubscriptionDevices {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
     }
 }

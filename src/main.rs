@@ -1,5 +1,5 @@
 use telegram_bot::adapters::telegram::router::start_bot;
-use telegram_bot::infrastructure::setup::AppState;
+use telegram_bot::bootstrap::AppState;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -8,6 +8,6 @@ async fn main() -> anyhow::Result<()> {
     let app = AppState::build().await?;
 
     start_bot(app.bot, app.bot_state).await;
-    
+
     Ok(())
 }

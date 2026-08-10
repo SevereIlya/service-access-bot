@@ -62,7 +62,7 @@ impl Subscription {
         }
     }
 
-    pub const fn assing_id(&mut self, id: SubscriptionId) {
+    pub const fn assign_id(&mut self, id: SubscriptionId) {
         self.id = Some(id);
     }
 
@@ -151,12 +151,12 @@ mod tests {
     ) -> Subscription {
         let now = Utc::now();
         Subscription::new(
-            UserId(42),
+            UserId::new(42),
             plan,
             now,
             now + Days::new(days_until_expiry),
             status,
-            SubscriptionDevices(2),
+            SubscriptionDevices::new(2),
         )
     }
 
@@ -166,12 +166,12 @@ mod tests {
 
     #[test]
     fn test_subscription_new_creates_valid_default_subscription() {
-        let user_id = UserId(42);
+        let user_id = UserId::new(42);
         let plan = SubscriptionPlan::Month3;
         let starts_at = Utc::now();
         let expires_at = starts_at + Months::new(3);
         let status = SubscriptionStatus::Active;
-        let devices = SubscriptionDevices(2);
+        let devices = SubscriptionDevices::new(2);
         let subscription = Subscription::new(
             user_id,
             plan.clone(),
@@ -203,12 +203,12 @@ mod tests {
     fn test_is_expired_returns_true_for_expired_subscription() {
         let now = Utc::now();
         let sub = Subscription::new(
-            UserId(42),
+            UserId::new(42),
             SubscriptionPlan::Month3,
             now - Days::new(10),
             now - Days::new(1),
             SubscriptionStatus::Active,
-            SubscriptionDevices(2),
+            SubscriptionDevices::new(2),
         );
         assert!(sub.is_expired(), "Подписка должна быть истекшей");
     }
@@ -240,12 +240,12 @@ mod tests {
     fn test_is_active_returns_false_for_expired_subscription() {
         let now = Utc::now();
         let sub = Subscription::new(
-            UserId(42),
+            UserId::new(42),
             SubscriptionPlan::Month3,
             now - Days::new(10),
             now - Days::new(1),
             SubscriptionStatus::Active,
-            SubscriptionDevices(2),
+            SubscriptionDevices::new(2),
         );
         assert!(
             !sub.is_active(),
@@ -310,12 +310,12 @@ mod tests {
     fn test_days_until_expiry_returns_negative_for_expired() {
         let now = Utc::now();
         let sub = Subscription::new(
-            UserId(42),
+            UserId::new(42),
             SubscriptionPlan::Month3,
             now - Days::new(10),
             now - Days::new(1),
             SubscriptionStatus::Active,
-            SubscriptionDevices(2),
+            SubscriptionDevices::new(2),
         );
         let days = sub.days_until_expiry();
         assert!(

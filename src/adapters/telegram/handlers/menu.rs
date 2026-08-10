@@ -7,6 +7,7 @@ use crate::domain::error::DomainError;
 use teloxide::prelude::*;
 use teloxide::types::{MaybeInaccessibleMessage, ParseMode::Html};
 use tracing::warn;
+use crate::domain::error::UserError::NotFound;
 
 #[allow(clippy::match_same_arms)] // Временно
 pub async fn handle_menu(
@@ -40,18 +41,18 @@ pub async fn handle_start_trial(
     let message_id = msg.id();
     let telegram_id = chat_id.0;
 
-    let Some(user) = state.get_user_query.execute(telegram_id).await? else {
+    let Some(user) = state.usecases.get_user.execute(telegram_id).await? else {
         // Отсутствие пользователя - это ошибка, но мы ее расцениваем как бизнес-сценарий.
         // Мы хотим отправить юзеру сообщение. Отправив это сообщение, мы успешно обработали
         // ситуацию с точки зрения бота. Поэтому возвращаем Ok(())
-        warn!(error = ?DomainError::UserNotFound, telegram_id, "Пользователь не найден");
+        warn!(error = ?DomainError::User(NotFound), telegram_id, "Пользователь не найден");
         let text =
-            message_error(&state.ui, &AppError::Domain(DomainError::UserNotFound));
+            message_error(&state.ui, &AppError::Domain(DomainError::User(NotFound)));
         bot.send_message(chat_id, text).await?;
         return Ok(());
     };
 
-    match state.start_trial_cmd.execute(user).await {
+    match state.usecases.start_trial.execute(user).await {
         Ok(subscription) => {
             let view =
                 views::build_trial_success_view(&state.ui, subscription.expires_at());
@@ -92,15 +93,15 @@ pub async fn show_main_menu(
     let message_id = msg.id();
     let telegram_id = chat_id.0;
 
-    let Some(user) = state.get_user_query.execute(telegram_id).await? else {
-        warn!(error = ?DomainError::UserNotFound, telegram_id, "Пользователь не найден");
+    let Some(user) = state.usecases.get_user.execute(telegram_id).await? else {
+        warn!(error = ?DomainError::User(NotFound), telegram_id, "Пользователь не найден");
         let text =
-            message_error(&state.ui, &AppError::Domain(DomainError::UserNotFound));
+            message_error(&state.ui, &AppError::Domain(DomainError::User(NotFound)));
         bot.send_message(chat_id, text).await?;
         return Ok(());
     };
 
-    let menu_state = state.get_menu_state_query.execute(&user).await?;
+    let menu_state = state.usecases.get_menu_state.execute(&user).await?;
 
     let view = if drop_down {
         views::build_refresh_menu_view(&state.ui, menu_state.can_trial)
@@ -113,7 +114,7 @@ pub async fn show_main_menu(
         .is_some_and(|m| m.photo().is_some() || m.document().is_some());
 
     if drop_down || is_media {
-        let _ = bot.delete_message(chat_id, message_id).await?;
+        let _ = bot.delete_message(chat_id, message_id).await;
         bot.send_message(chat_id, view.text)
             .parse_mode(Html)
             .reply_markup(view.keyboard)

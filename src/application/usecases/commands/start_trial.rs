@@ -1,5 +1,7 @@
 use crate::application::error::AppResult;
 use crate::domain::error::DomainError;
+use crate::domain::error::SubscriptionError::AlreadyHasActive;
+use crate::domain::error::UserError::EntityNotSaved;
 use crate::domain::subscription::{
     Subscription, SubscriptionDevices, SubscriptionPlan, SubscriptionStatus,
 };
@@ -17,13 +19,13 @@ impl StartTrialCommand {
     }
 
     pub async fn execute(&self, mut user: User) -> AppResult<Subscription> {
-        let id = user.id().ok_or(DomainError::EntityNotSaved)?;
+        let id = user.id().ok_or(DomainError::User(EntityNotSaved))?;
 
         let mut tx: BoxedUowContext = self.uow.begin().await?;
 
         if tx.subscriptions().find_active_by_user_id(id).await?.is_some() {
             tx.rollback().await?;
-            return Err(DomainError::AlreadyHasSubscription.into());
+            return Err(DomainError::Subscription(AlreadyHasActive).into());
         }
 
         user.use_trial()?;
@@ -34,7 +36,7 @@ impl StartTrialCommand {
             Utc::now(),
             Utc::now() + Days::new(5),
             SubscriptionStatus::Active,
-            SubscriptionDevices(2),
+            SubscriptionDevices::new(2),
         );
 
         tx.subscriptions().create(&sub).await?;
@@ -62,6 +64,7 @@ mod tests {
     use super::*;
     use crate::application::error::AppError;
     use crate::domain::error::DomainResult;
+    use crate::domain::error::UserError::TrialAlreadyUsed;
     use crate::domain::subscription::{
         DynSubscriptionRepository, SubscriptionRepository,
     };
@@ -74,6 +77,7 @@ mod tests {
     use chrono::Months;
     use std::sync::{Arc, Mutex};
     use uuid::Uuid;
+    
     // ==========================================
     // МОКИ
     // ==========================================
@@ -85,7 +89,7 @@ mod tests {
     #[async_trait]
     impl UserRepository for MockUserRepository {
         async fn create(&self, _user: &User) -> DomainResult<UserId> {
-            Ok(UserId(1))
+            Ok(UserId::new(1))
         }
         async fn update(&self, user: &User) -> DomainResult<()> {
             self.updated_users.lock().unwrap().push(user.clone());
@@ -119,12 +123,12 @@ mod tests {
         ) -> DomainResult<Option<Subscription>> {
             if self.has_active_sub {
                 let sub = Subscription::new(
-                    UserId(12),
+                    UserId::new(12),
                     SubscriptionPlan::Month3,
                     Utc::now(),
                     Utc::now() + Months::new(3),
                     SubscriptionStatus::Active,
-                    SubscriptionDevices(2),
+                    SubscriptionDevices::new(2),
                 );
                 Ok(Some(sub))
             } else {
@@ -185,16 +189,16 @@ mod tests {
 
     fn create_test_user(has_id: bool, trial_used: bool) -> User {
         let mut user = User::new(
-            TelegramId(123),
+            TelegramId::new(123),
             Uuid::new_v4(),
             Some("freddie".into()),
             "Freddie Mercury".into(),
-            Money(15000),
-            ReferralCode("REF".into()),
-            SubscriptionToken("TOK".into()),
+            Money::new(15000).unwrap(),
+            ReferralCode::new("REF".into()),
+            SubscriptionToken::new("TOK".into()),
         );
         if has_id {
-            user.assign_id(UserId(1));
+            user.assign_id(UserId::new(1));
         }
         if trial_used {
             let _ = user.use_trial();
@@ -258,7 +262,7 @@ mod tests {
         );
         assert_eq!(
             subscription.devices(),
-            SubscriptionDevices(2),
+            SubscriptionDevices::new(2),
             "Должно быть 2 устройства"
         );
         assert_eq!(
@@ -305,7 +309,7 @@ mod tests {
         assert!(result.is_err());
         assert!(matches!(
             result.unwrap_err(),
-            AppError::Domain(DomainError::EntityNotSaved)
+            AppError::Domain(DomainError::User(EntityNotSaved))
         ));
 
         assert!(
@@ -323,7 +327,7 @@ mod tests {
         assert!(result.is_err());
         assert!(matches!(
             result.unwrap_err(),
-            AppError::Domain(DomainError::TrialAlreadyUsed)
+            AppError::Domain(DomainError::User(TrialAlreadyUsed))
         ));
         assert!(
             !*committed.lock().unwrap(),
@@ -340,7 +344,7 @@ mod tests {
         assert!(result.is_err());
         assert!(matches!(
             result.unwrap_err(),
-            AppError::Domain(DomainError::AlreadyHasSubscription)
+            AppError::Domain(DomainError::Subscription(AlreadyHasActive))
         ));
         assert!(
             *rolled_back.lock().unwrap(),

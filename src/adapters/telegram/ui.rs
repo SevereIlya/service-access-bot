@@ -1,7 +1,6 @@
-use std::fs::read_to_string;
-use config::ConfigError::Message;
+use anyhow::Context;
 use serde::Deserialize;
-use crate::application::error::{AppError, AppResult};
+use std::fs::read_to_string;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct UiText {
@@ -40,15 +39,11 @@ pub struct ErrorText {
 }
 
 impl UiText {
-    pub fn load(path: &str) -> AppResult<Self> {
-        let content = read_to_string(path)
-            .map_err(|e| AppError::Config(
-                Message(format!("Unable to read the localization file: {e}"))
-            ))?;
-        let ui = toml::from_str(&content)
-            .map_err(|e| AppError::Config(
-                Message(format!("TOML parsing error: {e}"))
-            ))?;
+    pub fn load(path: &str) -> anyhow::Result<Self> {
+        let content =
+            read_to_string(path).context("Не удалось прочитать файл локализации")?;
+        let ui =
+            toml::from_str(&content).context("Ошибка парсинга TOML файла локализации")?;
         Ok(ui)
     }
 }

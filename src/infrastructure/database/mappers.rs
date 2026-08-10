@@ -10,17 +10,17 @@ impl TryFrom<UserRow> for User {
 
     fn try_from(row: UserRow) -> Result<Self, Self::Error> {
         Ok(Self::restore_from_db(
-            UserId(row.id),
-            TelegramId(row.telegram_id),
+            UserId::new(row.id),
+            TelegramId::new(row.telegram_id),
             row.uuid,
             row.username,
             row.full_name,
             row.role.parse()?,
-            Money(row.frozen_base_price),
-            ReferralCode(row.referral_code),
-            SubscriptionToken(row.subscription_token),
+            Money::new(row.frozen_base_price)?,
+            ReferralCode::new(row.referral_code),
+            SubscriptionToken::new(row.subscription_token),
             row.trial_used,
-            DiscountPercent::new(row.discount_percent),
+            DiscountPercent::new(row.discount_percent)?,
             row.created_at,
         ))
     }
@@ -31,13 +31,13 @@ impl TryFrom<SubscriptionRow> for Subscription {
 
     fn try_from(row: SubscriptionRow) -> Result<Self, Self::Error> {
         Ok(Self::restore_from_db(
-            SubscriptionId(row.id),
-            UserId(row.user_id),
+            SubscriptionId::new(row.id),
+            UserId::new(row.user_id),
             row.plan.parse()?,
             row.starts_at,
             row.expires_at,
             row.status.parse()?,
-            SubscriptionDevices(row.devices),
+            SubscriptionDevices::new(row.devices),
             row.created_at,
         ))
     }

@@ -17,7 +17,7 @@ pub async fn message_handler(
     let chat_id = msg.chat.id;
     let telegram_id = chat_id.0;
 
-    let user_opt = state.get_user_query.execute(telegram_id).await?;
+    let user_opt = state.usecases.get_user.execute(telegram_id).await?;
 
     // Пр1 - Рассылка
     if try_handle_broadcast(&bot, &msg, &state, &user_opt).await? {

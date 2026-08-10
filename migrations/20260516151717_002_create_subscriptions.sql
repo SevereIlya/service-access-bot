@@ -10,4 +10,4 @@ CREATE TABLE subscriptions
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_subscriptions_active ON subscriptions (user_id) WHERE status = 'active';
+CREATE UNIQUE INDEX idx_subscriptions_one_active ON subscriptions (user_id) WHERE status = 'active';

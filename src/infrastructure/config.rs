@@ -1,5 +1,4 @@
-use crate::application::error::AppResult;
-use config::{Config, File};
+use config::{Config, ConfigError, Environment, File};
 use serde::Deserialize;
 use std::net::IpAddr;
 use uuid::Uuid;
@@ -84,11 +83,11 @@ pub struct GeneralConfig {
 // ==============================================================================================
 
 impl AppConfig {
-    pub fn load() -> AppResult<Self> {
+    pub fn load() -> Result<Self, ConfigError> {
         let settings = Config::builder()
             .add_source(File::with_name("config.toml").required(true))
+            .add_source(Environment::with_prefix("BOT").separator("__"))
             .build()?;
-
-        Ok(settings.try_deserialize()?)
+        settings.try_deserialize()
     }
 }

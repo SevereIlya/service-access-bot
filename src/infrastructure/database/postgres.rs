@@ -1,9 +1,8 @@
-use crate::application::error::AppResult;
 use sqlx::PgPool;
 use sqlx::postgres::PgPoolOptions;
 use std::time::Duration;
 
-pub async fn create_pg_pool(database_url: &str) -> AppResult<PgPool> {
+pub async fn create_pg_pool(database_url: &str) -> Result<PgPool, sqlx::Error> {
     let pool = PgPoolOptions::new()
         .max_connections(5)
         .min_connections(2)

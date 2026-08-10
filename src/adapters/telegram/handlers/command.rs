@@ -26,12 +26,12 @@ pub async fn handle_commands(
                 .collect::<Vec<_>>()
                 .join(" ");
 
-            match state.register_user_cmd.execute(telegram_id, username, full_name).await
+            match state.usecases.register_user.execute(telegram_id, username, full_name).await
             {
                 Ok(user) => {
                     // TODO: Тут будет проверка рефералки try_process_referral
 
-                    let menu_state = state.get_menu_state_query.execute(&user).await?;
+                    let menu_state = state.usecases.get_menu_state.execute(&user).await?;
                     let view =
                         views::build_start_message(&state.ui, menu_state.can_trial);
                     bot.send_message(chat_id, view.text)
