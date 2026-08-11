@@ -4,7 +4,6 @@ pub mod postgres;
 pub mod subscription_repository;
 pub mod uow;
 pub mod user_repository;
-mod macros;
 
 pub use models::*;
 pub use postgres::*;

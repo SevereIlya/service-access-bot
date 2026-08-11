@@ -1,4 +1,4 @@
-use crate::domain::error::{DomainError, SubscriptionError};
+use crate::domain::error::{DomainError, DomainResult, SubscriptionError};
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -97,8 +97,11 @@ impl FromStr for SubscriptionStatus {
 
 impl SubscriptionDevices {
     #[must_use]
-    pub const fn new(id: i32) -> Self {
-        Self(id)
+    pub fn new(value: i32) -> DomainResult<Self> {
+        if !(1..=10).contains(&value) {
+            return Err(SubscriptionError::InvalidDevices(value).into())
+        }
+        Ok(Self(value))
     }
 
     #[must_use]

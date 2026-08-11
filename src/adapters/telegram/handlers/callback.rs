@@ -19,6 +19,7 @@ pub async fn callback_handler(
         return Ok(())
     };
 
+    bot.answer_callback_query(qry.id.clone()).await?;
     let action = CallbackAction::parse(&data);
     info!(action = ?action, "Получен callback от пользователя");
 
@@ -34,7 +35,5 @@ pub async fn callback_handler(
             );
         }
     }
-
-    bot.answer_callback_query(qry.id).await?;
     Ok(())
 }

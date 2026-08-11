@@ -36,7 +36,6 @@ pub struct BetatransferConfig {
 pub struct VpnConfig {
     pub nodes: Vec<VpnNodeConfig>,
     pub protocols: ProtocolsConfig,
-    pub uuid_namespace: Uuid,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -78,6 +77,7 @@ pub struct GeneralConfig {
     pub publicbase_url: String,
     pub telegram_token: String,
     pub admin_chat_id: i64,
+    pub uuid_namespace: Uuid,
 }
 
 // ==============================================================================================

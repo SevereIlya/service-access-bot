@@ -17,3 +17,22 @@ macro_rules! exec_query {
         }
     };
 }
+
+#[macro_export]
+macro_rules! in_transaction {
+    ($uow:expr, |$tx:ident| $body:block) => {{
+        let mut $tx = $uow.begin().await?;
+        match (async { $body }).await {
+            Ok(value) => {
+                $tx.commit().await?;
+                Ok(value)
+            }
+            Err(e) => {
+                if let Err(rollback_error) = $tx.rollback().await {
+                    tracing::error!(error = ?rollback_error, "rollback упал тоже");
+                }
+                Err(e)
+            }
+        }
+    }};
+}

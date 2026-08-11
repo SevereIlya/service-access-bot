@@ -1,4 +1,4 @@
-use crate::domain::error::{DomainError, DomainResult};
+use crate::domain::error::{DomainError, DomainResult, SubscriptionError};
 use crate::domain::subscription::{Subscription, SubscriptionRepository};
 use crate::domain::user::UserId;
 use crate::exec_query;
@@ -44,9 +44,24 @@ impl SubscriptionRepository for SqlxSubscriptionRepository {
             sub.created_at()
         );
 
-        exec_query!(self.executor, query, execute)
-            .map_err(|e| DomainError::SystemFailure(e.to_string()))?;
-        Ok(())
+        match exec_query!(self.executor, query, execute) {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                if let sqlx::Error::Database(db_err) = &e
+                    && db_err.code().as_deref() == Some("23505")
+                {
+                    match db_err.constraint() {
+                        Some("idx_subscriptions_one_active") => {
+                            return Err(DomainError::Subscription(
+                                SubscriptionError::AlreadyHasActive,
+                            ));
+                        }
+                        _ => {}
+                    }
+                }
+                Err(DomainError::SystemFailure(e.to_string()))
+            }
+        }
     }
 
     #[instrument(skip(self))]

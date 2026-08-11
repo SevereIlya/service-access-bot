@@ -37,7 +37,7 @@ impl TryFrom<SubscriptionRow> for Subscription {
             row.starts_at,
             row.expires_at,
             row.status.parse()?,
-            SubscriptionDevices::new(row.devices),
+            SubscriptionDevices::new(row.devices)?,
             row.created_at,
         ))
     }

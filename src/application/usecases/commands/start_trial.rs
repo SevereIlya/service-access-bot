@@ -5,8 +5,9 @@ use crate::domain::error::UserError::EntityNotSaved;
 use crate::domain::subscription::{
     Subscription, SubscriptionDevices, SubscriptionPlan, SubscriptionStatus,
 };
-use crate::domain::uow::{BoxedUowContext, DynUnitOfWork};
+use crate::domain::uow::DynUnitOfWork;
 use crate::domain::user::User;
+use crate::in_transaction;
 use chrono::{Days, Utc};
 
 pub struct StartTrialCommand {
@@ -21,37 +22,34 @@ impl StartTrialCommand {
     pub async fn execute(&self, mut user: User) -> AppResult<Subscription> {
         let id = user.id().ok_or(DomainError::User(EntityNotSaved))?;
 
-        let mut tx: BoxedUowContext = self.uow.begin().await?;
+        in_transaction!(self.uow, |tx| {
+            if tx.subscriptions().find_active_by_user_id(id).await?.is_some() {
+                return Err(DomainError::Subscription(AlreadyHasActive).into());
+            }
 
-        if tx.subscriptions().find_active_by_user_id(id).await?.is_some() {
-            tx.rollback().await?;
-            return Err(DomainError::Subscription(AlreadyHasActive).into());
-        }
+            user.use_trial()?;
 
-        user.use_trial()?;
+            let sub = Subscription::new(
+                id,
+                SubscriptionPlan::Trial,
+                Utc::now(),
+                Utc::now() + Days::new(5),
+                SubscriptionStatus::Active,
+                SubscriptionDevices::new(2)?,
+            );
 
-        let sub = Subscription::new(
-            id,
-            SubscriptionPlan::Trial,
-            Utc::now(),
-            Utc::now() + Days::new(5),
-            SubscriptionStatus::Active,
-            SubscriptionDevices::new(2),
-        );
+            tx.subscriptions().create(&sub).await?;
+            tx.users().update(&user).await?;
 
-        tx.subscriptions().create(&sub).await?;
-        tx.users().update(&user).await?;
+            tracing::info!(
+                user_id = %id,
+                plan = ?sub.plan(),
+                expires_at = %sub.expires_at(),
+                "Пользователю успешно выдан Trial"
+            );
 
-        tx.commit().await?;
-
-        tracing::info!(
-            user_id = %id,
-            plan = ?sub.plan(),
-            expires_at = %sub.expires_at(),
-            "Пользователю успешно выдан Trial"
-        );
-
-        Ok(sub)
+            Ok(sub)
+        })
     }
 }
 
@@ -68,7 +66,7 @@ mod tests {
     use crate::domain::subscription::{
         DynSubscriptionRepository, SubscriptionRepository,
     };
-    use crate::domain::uow::{UnitOfWork, UowContext};
+    use crate::domain::uow::{BoxedUowContext, UnitOfWork, UowContext};
     use crate::domain::user::{
         DynUserRepository, Money, ReferralCode, SubscriptionToken, TelegramId, UserId,
         UserRepository,
@@ -77,7 +75,7 @@ mod tests {
     use chrono::Months;
     use std::sync::{Arc, Mutex};
     use uuid::Uuid;
-    
+
     // ==========================================
     // МОКИ
     // ==========================================
@@ -128,7 +126,7 @@ mod tests {
                     Utc::now(),
                     Utc::now() + Months::new(3),
                     SubscriptionStatus::Active,
-                    SubscriptionDevices::new(2),
+                    SubscriptionDevices::new(2)?,
                 );
                 Ok(Some(sub))
             } else {
@@ -262,7 +260,7 @@ mod tests {
         );
         assert_eq!(
             subscription.devices(),
-            SubscriptionDevices::new(2),
+            SubscriptionDevices::new(2).unwrap(),
             "Должно быть 2 устройства"
         );
         assert_eq!(

@@ -37,7 +37,7 @@ impl AppState {
             user_repo,
             subscription_repo,
             uow,
-            config.vpn.uuid_namespace,
+            config.general.uuid_namespace,
             Money::new(config.payments.base_price)?,
         ));
         debug!("Сборка юзкейсов завершена");

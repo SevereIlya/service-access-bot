@@ -156,7 +156,7 @@ mod tests {
             now,
             now + Days::new(days_until_expiry),
             status,
-            SubscriptionDevices::new(2),
+            SubscriptionDevices::new(2).unwrap(),
         )
     }
 
@@ -171,7 +171,7 @@ mod tests {
         let starts_at = Utc::now();
         let expires_at = starts_at + Months::new(3);
         let status = SubscriptionStatus::Active;
-        let devices = SubscriptionDevices::new(2);
+        let devices = SubscriptionDevices::new(2).unwrap();
         let subscription = Subscription::new(
             user_id,
             plan.clone(),
@@ -208,7 +208,7 @@ mod tests {
             now - Days::new(10),
             now - Days::new(1),
             SubscriptionStatus::Active,
-            SubscriptionDevices::new(2),
+            SubscriptionDevices::new(2).unwrap(),
         );
         assert!(sub.is_expired(), "Подписка должна быть истекшей");
     }
@@ -245,7 +245,7 @@ mod tests {
             now - Days::new(10),
             now - Days::new(1),
             SubscriptionStatus::Active,
-            SubscriptionDevices::new(2),
+            SubscriptionDevices::new(2).unwrap(),
         );
         assert!(
             !sub.is_active(),
@@ -315,7 +315,7 @@ mod tests {
             now - Days::new(10),
             now - Days::new(1),
             SubscriptionStatus::Active,
-            SubscriptionDevices::new(2),
+            SubscriptionDevices::new(2).unwrap(),
         );
         let days = sub.days_until_expiry();
         assert!(

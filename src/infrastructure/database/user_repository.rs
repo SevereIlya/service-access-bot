@@ -61,12 +61,14 @@ impl UserRepository for SqlxUserRepository {
                 if let sqlx::Error::Database(db_err) = &e
                     && db_err.code().as_deref() == Some("23505")
                 {
-                    let constraint = db_err.constraint();
-                    if constraint == Some("users_referral_code_unique") {
-                        return Err(DomainError::User(ReferralCodeCollision));
-                    }
-                    if constraint == Some("users_telegram_id_unique") {
-                        return Err(DomainError::User(AlreadyExists));
+                    match db_err.constraint() {
+                        Some("users_referral_code_unique") => {
+                            return Err(DomainError::User(ReferralCodeCollision));
+                        }
+                        Some("users_telegram_id_unique") => {
+                            return Err(DomainError::User(AlreadyExists));
+                        }
+                        _ => {}
                     }
                 }
                 Err(DomainError::SystemFailure(e.to_string()))
