@@ -72,7 +72,7 @@ mod tests {
         UserRepository,
     };
     use async_trait::async_trait;
-    use chrono::{DateTime, Months};
+    use chrono::Months;
     use std::sync::{Arc, Mutex};
     use uuid::Uuid;
 
@@ -143,11 +143,7 @@ mod tests {
             Ok(vec![])
         }
 
-        async fn find_expiring_between(
-            &self,
-            _start: DateTime<Utc>,
-            _end: DateTime<Utc>,
-        ) -> DomainResult<Vec<Subscription>> {
+        async fn find_due_for_expiry_warning(&self) -> DomainResult<Vec<Subscription>> {
             Ok(vec![])
         }
     }

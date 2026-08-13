@@ -39,7 +39,7 @@ impl GetMenuStateQuery {
 mod tests {
     use super::*;
     use async_trait::async_trait;
-    use chrono::{DateTime, Days, Utc};
+    use chrono::{Days, Utc};
     use std::sync::Arc;
     use uuid::Uuid;
 
@@ -81,11 +81,7 @@ mod tests {
             unreachable!("find_lapsed_active() не используется в этом юзкейсе")
         }
 
-        async fn find_expiring_between(
-            &self,
-            _start: DateTime<Utc>,
-            _end: DateTime<Utc>,
-        ) -> DomainResult<Vec<Subscription>> {
+        async fn find_due_for_expiry_warning(&self) -> DomainResult<Vec<Subscription>> {
             unreachable!("find_expiring_between() не используется в этом юзкейсе")
         }
     }

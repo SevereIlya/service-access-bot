@@ -2,7 +2,6 @@ use super::entity::Subscription;
 use crate::domain::error::DomainResult;
 use crate::domain::user::UserId;
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
 use std::sync::Arc;
 
 pub type DynSubscriptionRepository = Arc<dyn SubscriptionRepository + Send + Sync>;
@@ -31,12 +30,7 @@ pub trait SubscriptionRepository: Send + Sync {
     /// Возвращает подписки со статусом `Active`, срок действия которых уже истёк.
     async fn find_lapsed_active(&self) -> DomainResult<Vec<Subscription>>;
 
-    /// Возвращает активные подписки, срок действия которых попадает в переданный временной интервал.
-    ///
-    /// Границы интервала включаются в поиск.
-    async fn find_expiring_between(
-        &self,
-        start: DateTime<Utc>,
-        end: DateTime<Utc>,
-    ) -> DomainResult<Vec<Subscription>>;
+    /// Возвращает активные подписки, срок действия которых истекает менее чем через 24 часа
+    /// и для которых предупреждение об истечении ещё не отправлялось.
+    async fn find_due_for_expiry_warning(&self) -> DomainResult<Vec<Subscription>>;
 }

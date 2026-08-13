@@ -7,6 +7,8 @@ use chrono::{DateTime, FixedOffset, Utc};
 use std::sync::Arc;
 use teloxide::prelude::*;
 use teloxide::types::ParseMode::Html;
+use teloxide::{ApiError, RequestError};
+use tracing::info;
 
 pub struct TelegramNotifier {
     bot: Bot,
@@ -33,12 +35,21 @@ impl Notifier for TelegramNotifier {
             expires_at.with_timezone(&msk_offset).format("%d.%m.%Y %H:%M").to_string();
         let text = self.ui.message.msg_subscription_expiring.replace("{date}", &date_str);
         let chat_id = ChatId(user.telegram_id().inner());
-        self.bot
-            .send_message(chat_id, text)
-            .parse_mode(Html)
-            .await
-            .map_err(|e| DomainError::SystemFailure(e.to_string()))?;
-        Ok(())
+
+        match self.bot.send_message(chat_id, text).parse_mode(Html).await {
+            Ok(_) => Ok(()),
+            Err(RequestError::Api(err)) => {
+                if let ApiError::BotBlocked | ApiError::UserDeactivated = err {
+                    info!(
+                        telegram_id = %user.telegram_id(),
+                        "Юзер заблокировал бота."
+                    );
+                    return Ok(());
+                }
+                Err(DomainError::SystemFailure(err.to_string()))
+            }
+            Err(e) => Err(DomainError::SystemFailure(e.to_string())),
+        }
     }
 
     async fn notify_subscription_expired(&self, user: &User) -> DomainResult<()> {

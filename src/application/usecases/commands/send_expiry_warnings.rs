@@ -2,8 +2,7 @@ use crate::application::error::AppResult;
 use crate::domain::notification::DynNotifier;
 use crate::domain::subscription::DynSubscriptionRepository;
 use crate::domain::user::DynUserRepository;
-use chrono::{Duration, Utc};
-use tracing::{error, warn};
+use tracing::{error, info, warn};
 
 #[derive(Debug, Default)]
 pub struct WarningSummary {
@@ -31,18 +30,11 @@ impl SendExpiryWarningsCommand {
     }
 
     pub async fn execute(&self) -> AppResult<WarningSummary> {
-        let now = Utc::now();
-        let window_start = now + Duration::hours(23);
-        let window_end = now + Duration::hours(24);
-
-        let expiring = self
-            .subscription_repo
-            .find_expiring_between(window_start, window_end)
-            .await?;
+        let expiring = self.subscription_repo.find_due_for_expiry_warning().await?;
 
         let mut summary = WarningSummary::default();
 
-        for sub in expiring {
+        for mut sub in expiring {
             let user_id = sub.user_id();
 
             let user = match self.user_repo.find_by_user_id(user_id).await {
@@ -66,6 +58,15 @@ impl SendExpiryWarningsCommand {
                 summary.failed += 1;
                 continue;
             }
+
+            sub.mark_warning_sent();
+            if let Err(e) = self.subscription_repo.update(&sub).await {
+                error!(user_id = %user_id, error = %e, "сообщение отправлено, но не удалось обновить флаг в БД");
+                summary.failed += 1;
+                continue;
+            }
+
+            info!(user_id = %user_id, "предупреждение об истечении подписки успешно отправлено");
 
             summary.warned += 1;
         }
@@ -124,7 +125,8 @@ mod tests {
 
     struct MockSubscriptionRepository {
         expiring: Vec<Subscription>,
-        seen_window: Arc<Mutex<Option<(DateTime<Utc>, DateTime<Utc>)>>>,
+        updated_subs: Arc<Mutex<Vec<Subscription>>>,
+        fail_update: bool,
     }
 
     #[async_trait]
@@ -132,8 +134,12 @@ mod tests {
         async fn create(&self, _subscription: &Subscription) -> DomainResult<()> {
             unreachable!("create() не используется в этом юзкейсе")
         }
-        async fn update(&self, _subscription: &Subscription) -> DomainResult<()> {
-            unreachable!("update() не используется в этом юзкейсе")
+        async fn update(&self, subscription: &Subscription) -> DomainResult<()> {
+            if self.fail_update {
+                return Err(DomainError::SystemFailure("DB error".into()));
+            }
+            self.updated_subs.lock().unwrap().push(subscription.clone());
+            Ok(())
         }
         async fn find_active_by_user_id(
             &self,
@@ -144,12 +150,7 @@ mod tests {
         async fn find_lapsed_active(&self) -> DomainResult<Vec<Subscription>> {
             unreachable!("find_lapsed_active() не используется в этом юзкейсе")
         }
-        async fn find_expiring_between(
-            &self,
-            start: DateTime<Utc>,
-            end: DateTime<Utc>,
-        ) -> DomainResult<Vec<Subscription>> {
-            *self.seen_window.lock().unwrap() = Some((start, end));
+        async fn find_due_for_expiry_warning(&self) -> DomainResult<Vec<Subscription>> {
             Ok(self.expiring.clone())
         }
     }
@@ -194,6 +195,7 @@ mod tests {
         user.assign_id(UserId::new(id));
         user
     }
+
     fn make_expiring_subscription(
         user_id: i64,
         expires_at: DateTime<Utc>,
@@ -207,21 +209,24 @@ mod tests {
             SubscriptionDevices::new(2).unwrap(),
         )
     }
+
     #[allow(clippy::type_complexity)]
     fn setup(
         users: Vec<User>,
         expiring: Vec<Subscription>,
         fail_notify: bool,
+        fail_update: bool,
     ) -> (
         SendExpiryWarningsCommand,
-        Arc<Mutex<Option<(DateTime<Utc>, DateTime<Utc>)>>>,
+        Arc<Mutex<Vec<Subscription>>>,
         Arc<Mutex<Vec<(UserId, DateTime<Utc>)>>>,
     ) {
         let user_repo = Arc::new(MockUserRepository { users });
-        let seen_window = Arc::new(Mutex::new(None));
+        let updated_subs = Arc::new(Mutex::new(Vec::new()));
         let sub_repo = Arc::new(MockSubscriptionRepository {
             expiring,
-            seen_window: seen_window.clone(),
+            updated_subs: updated_subs.clone(),
+            fail_update,
         });
         let calls = Arc::new(Mutex::new(Vec::new()));
         let notifier = Arc::new(MockNotifier {
@@ -229,7 +234,7 @@ mod tests {
             calls: calls.clone(),
         });
         let cmd = SendExpiryWarningsCommand::new(sub_repo, user_repo, notifier);
-        (cmd, seen_window, calls)
+        (cmd, updated_subs, calls)
     }
 
     // ==========================================
@@ -238,84 +243,90 @@ mod tests {
 
     #[tokio::test]
     async fn test_no_expiring_subscriptions_does_nothing() {
-        let (cmd, _window, calls) = setup(vec![], vec![], false);
+        let (cmd, updated, calls) = setup(vec![], vec![], false, false);
         let summary = cmd.execute().await.unwrap();
+
         assert_eq!(summary.warned, 0);
         assert_eq!(summary.failed, 0);
         assert!(calls.lock().unwrap().is_empty());
+        assert!(updated.lock().unwrap().is_empty());
     }
 
     #[tokio::test]
-    async fn test_sends_warning_happy_path() {
+    async fn test_sends_warning_and_updates_db_happy_path() {
         let expires_at = Utc::now() + Days::new(1);
         let user = make_user(1);
         let sub = make_expiring_subscription(1, expires_at);
-        let (cmd, _window, calls) = setup(vec![user], vec![sub], false);
+        let (cmd, updated, calls) = setup(vec![user], vec![sub], false, false);
 
         let summary = cmd.execute().await.unwrap();
 
         assert_eq!(summary.warned, 1);
         assert_eq!(summary.failed, 0);
-        let calls = calls.lock().unwrap();
-        assert_eq!(calls.len(), 1);
-        assert_eq!(calls[0].0, UserId::new(1));
-        assert_eq!(
-            calls[0].1, expires_at,
-            "юзеру должна прийти точная дата истечения его подписки"
+
+        let calls_guard = calls.lock().unwrap();
+
+        assert_eq!(calls_guard.len(), 1);
+        assert_eq!(calls_guard[0].0, UserId::new(1));
+
+        let updated_guard = updated.lock().unwrap();
+
+        assert_eq!(updated_guard.len(), 1);
+        assert!(
+            updated_guard[0].is_warning_sent(),
+            "Флаг должен быть установлен"
         );
     }
 
     #[tokio::test]
-    async fn test_uses_23_to_24_hour_window() {
-        let (cmd, window, _calls) = setup(vec![], vec![], false);
-        let now_before = Utc::now();
-        cmd.execute().await.unwrap();
-
-        let (start, end) =
-            window.lock().unwrap().expect("find_expiring_between должен был вызваться");
-        let expected_start = now_before + chrono::Duration::hours(23);
-        let expected_end = now_before + chrono::Duration::hours(24);
-
-        assert!(
-            (start - expected_start).num_milliseconds().abs() < 500,
-            "начало окна должно быть ~23 часа от текущего момента"
-        );
-        assert!(
-            (end - expected_end).num_milliseconds().abs() < 500,
-            "конец окна должен быть ~24 часа от текущего момента"
-        );
-    }
-
-    #[tokio::test]
-    async fn test_user_not_found_counts_as_failed() {
+    async fn test_user_not_found_skips_and_counts_as_failed() {
         let sub = make_expiring_subscription(1, Utc::now() + Days::new(1));
-        let (cmd, _window, calls) = setup(vec![], vec![sub], false);
+        let (cmd, updated, calls) = setup(vec![], vec![sub], false, false);
 
         let summary = cmd.execute().await.unwrap();
 
         assert_eq!(summary.warned, 0);
         assert_eq!(summary.failed, 1);
         assert!(calls.lock().unwrap().is_empty());
+        assert!(
+            updated.lock().unwrap().is_empty(),
+            "БД не должна обновляться"
+        );
     }
 
     #[tokio::test]
-    async fn test_notify_failure_counts_as_failed() {
+    async fn test_notify_failure_skips_db_update() {
         let user = make_user(1);
         let sub = make_expiring_subscription(1, Utc::now() + Days::new(1));
-        let (cmd, _window, calls) = setup(vec![user], vec![sub], true);
+
+        let (cmd, updated, calls) = setup(vec![user], vec![sub], true, false);
+
+        let summary = cmd.execute().await.unwrap();
+
+        assert_eq!(summary.warned, 0);
+        assert_eq!(summary.failed, 1);
+        assert_eq!(calls.lock().unwrap().len(), 1, "Попытка отправки была");
+        assert!(
+            updated.lock().unwrap().is_empty(),
+            "БД не должна обновляться при падении сети"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_db_update_failure_counts_as_failed() {
+        let user = make_user(1);
+        let sub = make_expiring_subscription(1, Utc::now() + Days::new(1));
+
+        let (cmd, _updated, calls) = setup(vec![user], vec![sub], false, true);
 
         let summary = cmd.execute().await.unwrap();
 
         assert_eq!(
             summary.warned, 0,
-            "тут уведомление - вся работа команды, поэтому её провал = провал операции"
+            "Не засчитываем в успех, если стейт не сохранен"
         );
         assert_eq!(summary.failed, 1);
-        assert_eq!(
-            calls.lock().unwrap().len(),
-            1,
-            "попытка отправить всё же была"
-        );
+        assert_eq!(calls.lock().unwrap().len(), 1, "Телега отработала");
     }
 
     #[tokio::test]
@@ -324,12 +335,15 @@ mod tests {
         let user2 = make_user(2);
         let sub1 = make_expiring_subscription(1, Utc::now() + Days::new(1));
         let sub2 = make_expiring_subscription(2, Utc::now() + Days::new(1));
-        let (cmd, _window, calls) = setup(vec![user1, user2], vec![sub1, sub2], false);
+
+        let (cmd, updated, calls) =
+            setup(vec![user1, user2], vec![sub1, sub2], false, false);
 
         let summary = cmd.execute().await.unwrap();
 
         assert_eq!(summary.warned, 2);
         assert_eq!(summary.failed, 0);
         assert_eq!(calls.lock().unwrap().len(), 2);
+        assert_eq!(updated.lock().unwrap().len(), 2);
     }
 }

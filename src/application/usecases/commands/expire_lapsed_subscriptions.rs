@@ -157,12 +157,8 @@ mod tests {
         async fn find_lapsed_active(&self) -> DomainResult<Vec<Subscription>> {
             Ok(self.lapsed.clone())
         }
-        async fn find_expiring_between(
-            &self,
-            _start: DateTime<Utc>,
-            _end: DateTime<Utc>,
-        ) -> DomainResult<Vec<Subscription>> {
-            unreachable!("find_expiring_between() не используется в этом юзкейсе")
+        async fn find_due_for_expiry_warning(&self) -> DomainResult<Vec<Subscription>> {
+            unreachable!("find_due_for_expiry_warning() не используется в этом юзкейсе")
         }
     }
 

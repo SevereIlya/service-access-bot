@@ -244,7 +244,6 @@ mod tests {
             created_at,
         );
 
-        // Погнали по геттерам!
         assert_eq!(user.id(), Some(id));
         assert_eq!(user.telegram_id(), tg_id);
         assert_eq!(user.uuid(), uuid);

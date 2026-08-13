@@ -38,6 +38,7 @@ impl TryFrom<SubscriptionRow> for Subscription {
             row.expires_at,
             row.status.parse()?,
             SubscriptionDevices::new(row.devices)?,
+            row.is_warning_sent,
             row.created_at,
         ))
     }

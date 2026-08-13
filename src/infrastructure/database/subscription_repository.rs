@@ -4,7 +4,6 @@ use crate::domain::user::UserId;
 use crate::exec_query;
 use crate::infrastructure::database::{SharedTransaction, SqlxExecutor, SubscriptionRow};
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 use tracing::instrument;
 
@@ -33,8 +32,8 @@ impl SubscriptionRepository for SqlxSubscriptionRepository {
     async fn create(&self, sub: &Subscription) -> DomainResult<()> {
         let query = sqlx::query!(
             r#"
-            INSERT INTO subscriptions (user_id, plan, starts_at, expires_at, status, devices, created_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            INSERT INTO subscriptions (user_id, plan, starts_at, expires_at, status, devices, is_warning_sent, created_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             "#,
             sub.user_id().inner(),
             sub.plan().as_str(),
@@ -42,6 +41,7 @@ impl SubscriptionRepository for SqlxSubscriptionRepository {
             sub.expires_at(),
             sub.status().as_str(),
             sub.devices().inner(),
+            false,
             sub.created_at()
         );
 
@@ -78,13 +78,15 @@ impl SubscriptionRepository for SqlxSubscriptionRepository {
             SET plan = $1,
                 expires_at = $2,
                 status = $3,
-                devices = $4
-            WHERE id = $5
+                devices = $4,
+                is_warning_sent = $5
+            WHERE id = $6
             "#,
             sub.plan().as_str(),
             sub.expires_at(),
             sub.status().as_str(),
             sub.devices().inner(),
+            sub.is_warning_sent(),
             id.inner(),
         );
 
@@ -137,21 +139,17 @@ impl SubscriptionRepository for SqlxSubscriptionRepository {
     }
 
     #[instrument(skip(self))]
-    async fn find_expiring_between(
-        &self,
-        start: DateTime<Utc>,
-        end: DateTime<Utc>,
-    ) -> DomainResult<Vec<Subscription>> {
+    async fn find_due_for_expiry_warning(&self) -> DomainResult<Vec<Subscription>> {
         let query = sqlx::query_as!(
             SubscriptionRow,
             r#"
             SELECT *
             FROM subscriptions
             WHERE status = 'active'
-              AND expires_at BETWEEN $1 AND $2
-            "#,
-            start,
-            end,
+              AND is_warning_sent = false
+              AND expires_at <= NOW() + INTERVAL '24 hours'
+              AND expires_at > NOW()
+            "#
         );
 
         let rows: Vec<SubscriptionRow> = exec_query!(self.executor, query, fetch_all)

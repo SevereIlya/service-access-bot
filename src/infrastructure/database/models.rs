@@ -27,5 +27,6 @@ pub struct SubscriptionRow {
     pub expires_at: DateTime<Utc>,
     pub status: String,
     pub devices: i32,
+    pub is_warning_sent: bool,
     pub created_at: DateTime<Utc>,
 }

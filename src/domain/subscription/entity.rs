@@ -13,6 +13,7 @@ pub struct Subscription {
     expires_at: DateTime<Utc>,
     status: SubscriptionStatus,
     devices: SubscriptionDevices,
+    is_warning_sent: bool,
     created_at: DateTime<Utc>,
 }
 
@@ -37,6 +38,7 @@ impl Subscription {
             expires_at,
             status,
             devices,
+            is_warning_sent: false,
             created_at: Utc::now(),
         }
     }
@@ -52,6 +54,7 @@ impl Subscription {
         expires_at: DateTime<Utc>,
         status: SubscriptionStatus,
         devices: SubscriptionDevices,
+        is_warning_sent: bool,
         created_at: DateTime<Utc>,
     ) -> Self {
         Self {
@@ -62,6 +65,7 @@ impl Subscription {
             expires_at,
             status,
             devices,
+            is_warning_sent,
             created_at,
         }
     }
@@ -108,6 +112,12 @@ impl Subscription {
         self.devices
     }
 
+    /// Возвращает признак того, было ли отправлено предупреждение о скором истечении подписки.
+    #[must_use]
+    pub const fn is_warning_sent(&self) -> bool {
+        self.is_warning_sent
+    }
+
     /// Возвращает время создания подписки.
     #[must_use]
     pub const fn created_at(&self) -> DateTime<Utc> {
@@ -134,6 +144,11 @@ impl Subscription {
     /// Устанавливает подписке статус `Expired`.
     pub const fn expire(&mut self) {
         self.status = SubscriptionStatus::Expired;
+    }
+
+    /// Отмечает, что предупреждение о скором истечении подписки было отправлено
+    pub const fn mark_warning_sent(&mut self) {
+        self.is_warning_sent = true;
     }
 
     /// Проверяет, является ли подписка активной.
@@ -209,6 +224,7 @@ mod tests {
         assert_eq!(subscription.expires_at, expires_at);
         assert_eq!(subscription.status, status);
         assert_eq!(subscription.devices, devices);
+        assert_eq!(subscription.is_warning_sent, false);
     }
 
     #[test]
@@ -369,6 +385,7 @@ mod tests {
         let starts_at = Utc::now() - Days::new(10);
         let expires_at = starts_at + Months::new(6);
         let status = SubscriptionStatus::Inactive;
+        let is_warning_sent = false;
         let devices = SubscriptionDevices::new(5).unwrap();
         let created_at = Utc::now() - Days::new(10);
 
@@ -380,6 +397,7 @@ mod tests {
             expires_at,
             status,
             devices,
+            is_warning_sent,
             created_at,
         );
 
@@ -390,6 +408,7 @@ mod tests {
         assert_eq!(sub.expires_at(), expires_at);
         assert_eq!(sub.status(), status);
         assert_eq!(sub.devices(), devices);
+        assert_eq!(sub.is_warning_sent(), is_warning_sent);
         assert_eq!(sub.created_at(), created_at);
     }
 
@@ -414,6 +433,27 @@ mod tests {
             sub.id(),
             Some(expected_id),
             "assign_id должен был присвоить корректный ID"
+        );
+    }
+
+    #[test]
+    fn test_mark_warning_sent_marks_warning_as_sent() {
+        let mut subscription = create_test_subscription(
+            SubscriptionPlan::Month3,
+            SubscriptionStatus::Active,
+            30,
+        );
+
+        assert!(
+            !subscription.is_warning_sent(),
+            "Для новой подписки предупреждение ещё не должно быть отправлено"
+        );
+
+        subscription.mark_warning_sent();
+
+        assert!(
+            subscription.is_warning_sent(),
+            "Предупреждение должно считаться отправленным"
         );
     }
 }
