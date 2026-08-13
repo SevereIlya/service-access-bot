@@ -7,6 +7,7 @@ pub mod callbacks;
 pub mod commands;
 pub mod error;
 pub mod handlers;
+pub mod notifier;
 pub mod router;
 pub mod ui;
 pub mod views;

@@ -15,6 +15,8 @@ pub struct MsgText {
     pub msg_main_menu_view: String,
     pub msg_refresh_menu_view: String,
     pub msg_unknown_command: String,
+    pub msg_subscription_expiring: String,
+    pub msg_subscription_expired: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]

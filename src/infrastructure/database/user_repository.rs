@@ -1,7 +1,4 @@
-use crate::domain::error::UserError::{
-    AlreadyExists, EntityNotSaved, ReferralCodeCollision,
-};
-use crate::domain::error::{DomainError, DomainResult};
+use crate::domain::error::{DomainError, DomainResult, UserError};
 use crate::domain::user::{TelegramId, User, UserId, UserRepository};
 use crate::exec_query;
 use crate::infrastructure::database::{SharedTransaction, SqlxExecutor, UserRow};
@@ -63,10 +60,10 @@ impl UserRepository for SqlxUserRepository {
                 {
                     match db_err.constraint() {
                         Some("users_referral_code_unique") => {
-                            return Err(DomainError::User(ReferralCodeCollision));
+                            return Err(DomainError::User(UserError::ReferralCodeCollision));
                         }
                         Some("users_telegram_id_unique") => {
-                            return Err(DomainError::User(AlreadyExists));
+                            return Err(DomainError::User(UserError::AlreadyExists));
                         }
                         _ => {}
                     }
@@ -78,7 +75,7 @@ impl UserRepository for SqlxUserRepository {
 
     #[instrument(skip(self, user), fields(telegram_id = %user.telegram_id()))]
     async fn update(&self, user: &User) -> DomainResult<()> {
-        let id = user.id().ok_or(DomainError::User(EntityNotSaved))?;
+        let id = user.id().ok_or(DomainError::User(UserError::EntityNotSaved))?;
 
         let query = sqlx::query!(
             r#"
@@ -102,7 +99,6 @@ impl UserRepository for SqlxUserRepository {
 
         exec_query!(self.executor, query, execute)
             .map_err(|e| DomainError::SystemFailure(e.to_string()))?;
-
         Ok(())
     }
 

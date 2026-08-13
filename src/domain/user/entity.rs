@@ -171,6 +171,7 @@ impl User {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::Days;
 
     // ==========================================
     // ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ
@@ -211,6 +212,88 @@ mod tests {
         );
         assert_eq!(user.trial_used, false);
         assert_eq!(user.discount_percent, DiscountPercent::zero());
+    }
+
+    #[test]
+    fn test_restore_from_db_and_getters() {
+        let id = UserId::new(42);
+        let tg_id = TelegramId::new(987654321);
+        let uuid = Uuid::new_v4();
+        let username = Some("ivan_ivanov".to_string());
+        let full_name = "Ivan Ivanov".to_string();
+        let role = UserRole::Admin;
+        let base_price = Money::new(15000).unwrap();
+        let ref_code = ReferralCode::new("PB5uCkAQB6j8".to_string());
+        let sub_token = SubscriptionToken::new("4jw5emPkVq".to_string());
+        let trial_used = true;
+        let discount = DiscountPercent::new(10).unwrap();
+        let created_at = Utc::now() - Days::new(5);
+
+        let user = User::restore_from_db(
+            id,
+            tg_id,
+            uuid,
+            username.clone(),
+            full_name.clone(),
+            role,
+            base_price,
+            ref_code.clone(),
+            sub_token.clone(),
+            trial_used,
+            discount,
+            created_at,
+        );
+
+        // Погнали по геттерам!
+        assert_eq!(user.id(), Some(id));
+        assert_eq!(user.telegram_id(), tg_id);
+        assert_eq!(user.uuid(), uuid);
+        assert_eq!(user.username(), username);
+        assert_eq!(user.full_name(), full_name);
+        assert_eq!(user.role(), role);
+        assert_eq!(user.frozen_base_price(), base_price);
+        assert_eq!(user.referral_code(), &ref_code);
+        assert_eq!(user.subscription_token(), &sub_token);
+        assert_eq!(user.trial_used(), trial_used);
+        assert_eq!(user.discount_percent(), discount);
+        assert_eq!(user.created_at(), created_at);
+    }
+
+    #[test]
+    fn test_assign_id_sets_correct_id() {
+        let mut user = create_base_user();
+        assert_eq!(
+            user.id(),
+            None,
+            "У только что созданного юзера не должно быть ID"
+        );
+
+        let new_id = UserId::new(777);
+        user.assign_id(new_id.clone());
+
+        assert_eq!(
+            user.id(),
+            Some(new_id),
+            "Метод assign_id должен корректно устанавливать ID"
+        );
+    }
+
+    #[test]
+    fn test_update_profile_changes_data_correctly() {
+        let mut user = create_base_user();
+
+        assert_eq!(user.username(), Some("freddie".to_string()));
+        assert_eq!(user.full_name(), "Freddie Mercury");
+
+        user.update_profile(None, "Farrokh Bulsara".to_string());
+
+        assert_eq!(user.username(), None);
+        assert_eq!(user.full_name(), "Farrokh Bulsara");
+
+        user.update_profile(Some("queen_legend".to_string()), "Freddie Boss".to_string());
+
+        assert_eq!(user.username(), Some("queen_legend".to_string()));
+        assert_eq!(user.full_name(), "Freddie Boss");
     }
 
     #[test]

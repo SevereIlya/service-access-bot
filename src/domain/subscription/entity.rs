@@ -17,6 +17,9 @@ pub struct Subscription {
 }
 
 impl Subscription {
+    /// Создаёт новую подписку.
+    ///
+    /// Идентификатор подписки устанавливается после сохранения в базе данных.
     #[must_use]
     pub fn new(
         user_id: UserId,
@@ -38,6 +41,7 @@ impl Subscription {
         }
     }
 
+    /// Восстанавливает подписку из базы данных.
     #[must_use]
     #[allow(clippy::too_many_arguments)]
     pub const fn restore_from_db(
@@ -62,69 +66,87 @@ impl Subscription {
         }
     }
 
-    pub const fn assign_id(&mut self, id: SubscriptionId) {
-        self.id = Some(id);
-    }
-
+    /// Возвращает идентификатор подписки, если он был назначен.
     #[must_use]
     pub const fn id(&self) -> Option<SubscriptionId> {
         self.id
     }
 
+    /// Возвращает идентификатор пользователя, которому принадлежит подписка.
     #[must_use]
     pub const fn user_id(&self) -> UserId {
         self.user_id
     }
 
+    /// Возвращает тарифный план подписки.
     #[must_use]
     pub const fn plan(&self) -> SubscriptionPlan {
         self.plan
     }
 
+    /// Возвращает время начала действия подписки.
     #[must_use]
     pub const fn starts_at(&self) -> DateTime<Utc> {
         self.starts_at
     }
 
+    /// Возвращает время окончания действия подписки.
     #[must_use]
     pub const fn expires_at(&self) -> DateTime<Utc> {
         self.expires_at
     }
 
+    /// Возвращает текущий статус подписки.
     #[must_use]
     pub const fn status(&self) -> SubscriptionStatus {
         self.status
     }
 
+    /// Возвращает ограничения на количество устройств подписки.
     #[must_use]
     pub const fn devices(&self) -> SubscriptionDevices {
         self.devices
     }
 
+    /// Возвращает время создания подписки.
     #[must_use]
     pub const fn created_at(&self) -> DateTime<Utc> {
         self.created_at
     }
 
-    /// Проверяет, может ли подписка быть продлена
+    /// Назначает подписке идентификатор.
+    pub const fn assign_id(&mut self, id: SubscriptionId) {
+        self.id = Some(id);
+    }
+
+    /// Проверяет, имеет ли подписка статус `Active`.
     #[must_use]
     pub fn can_extend(&self) -> bool {
         self.status == SubscriptionStatus::Active
     }
 
-    /// Проверяет, истекла ли подписка
+    /// Проверяет, истёк ли срок действия подписки.
     #[must_use]
     pub fn is_expired(&self) -> bool {
         Utc::now() > self.expires_at
     }
 
-    /// Проверяет, активна ли подписка (не истекла и статус active)
+    /// Устанавливает подписке статус `Expired`.
+    pub const fn expire(&mut self) {
+        self.status = SubscriptionStatus::Expired;
+    }
+
+    /// Проверяет, является ли подписка активной.
+    ///
+    /// Подписка считается активной, если она имеет статус `Active` и срок её действия ещё не истёк.
     #[must_use]
     pub fn is_active(&self) -> bool {
         self.can_extend() && !self.is_expired()
     }
 
-    /// Возвращает количество дней до истечения подписки
+    /// Возвращает количество полных дней до истечения срока действия.
+    ///
+    /// Для уже истёкшей подписки возвращает отрицательное значение.
     #[must_use]
     pub fn days_until_expiry(&self) -> i64 {
         (self.expires_at - Utc::now()).num_days()
@@ -211,6 +233,21 @@ mod tests {
             SubscriptionDevices::new(2).unwrap(),
         );
         assert!(sub.is_expired(), "Подписка должна быть истекшей");
+    }
+
+    #[test]
+    fn test_expire_transitions_status_to_expired() {
+        let mut sub = create_test_subscription(
+            SubscriptionPlan::Month3,
+            SubscriptionStatus::Active,
+            30,
+        );
+        sub.expire();
+        assert_eq!(
+            sub.status,
+            SubscriptionStatus::Expired,
+            "expire() обязан переводить статус в Expired"
+        );
     }
 
     #[test]
@@ -321,6 +358,62 @@ mod tests {
         assert!(
             days < 0,
             "Для истекшей подписки количество дней должно быть отрицательным"
+        );
+    }
+
+    #[test]
+    fn test_restore_from_db_and_getters() {
+        let id = SubscriptionId::new(100500);
+        let user_id = UserId::new(42);
+        let plan = SubscriptionPlan::Month6;
+        let starts_at = Utc::now() - Days::new(10);
+        let expires_at = starts_at + Months::new(6);
+        let status = SubscriptionStatus::Inactive;
+        let devices = SubscriptionDevices::new(5).unwrap();
+        let created_at = Utc::now() - Days::new(10);
+
+        let sub = Subscription::restore_from_db(
+            id,
+            user_id,
+            plan,
+            starts_at,
+            expires_at,
+            status,
+            devices,
+            created_at,
+        );
+
+        assert_eq!(sub.id(), Some(id));
+        assert_eq!(sub.user_id(), user_id);
+        assert_eq!(sub.plan(), plan);
+        assert_eq!(sub.starts_at(), starts_at);
+        assert_eq!(sub.expires_at(), expires_at);
+        assert_eq!(sub.status(), status);
+        assert_eq!(sub.devices(), devices);
+        assert_eq!(sub.created_at(), created_at);
+    }
+
+    #[test]
+    fn test_assign_id_sets_expected_value() {
+        let mut sub = create_test_subscription(
+            SubscriptionPlan::Month3,
+            SubscriptionStatus::Active,
+            30,
+        );
+
+        assert_eq!(
+            sub.id(),
+            None,
+            "У новой подписки не должно быть ID до сохранения в БД"
+        );
+
+        let expected_id = SubscriptionId::new(999);
+        sub.assign_id(expected_id.clone());
+
+        assert_eq!(
+            sub.id(),
+            Some(expected_id),
+            "assign_id должен был присвоить корректный ID"
         );
     }
 }

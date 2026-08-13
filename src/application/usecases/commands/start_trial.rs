@@ -72,12 +72,12 @@ mod tests {
         UserRepository,
     };
     use async_trait::async_trait;
-    use chrono::Months;
+    use chrono::{DateTime, Months};
     use std::sync::{Arc, Mutex};
     use uuid::Uuid;
 
     // ==========================================
-    // МОКИ
+    // Моки
     // ==========================================
 
     struct MockUserRepository {
@@ -115,6 +115,11 @@ mod tests {
             self.created_subscriptions.lock().unwrap().push(subscription.clone());
             Ok(())
         }
+
+        async fn update(&self, _subscription: &Subscription) -> DomainResult<()> {
+            Ok(())
+        }
+
         async fn find_active_by_user_id(
             &self,
             _user_id: UserId,
@@ -133,9 +138,19 @@ mod tests {
                 Ok(None)
             }
         }
-    }
 
-    // =========================================
+        async fn find_lapsed_active(&self) -> DomainResult<Vec<Subscription>> {
+            Ok(vec![])
+        }
+
+        async fn find_expiring_between(
+            &self,
+            _start: DateTime<Utc>,
+            _end: DateTime<Utc>,
+        ) -> DomainResult<Vec<Subscription>> {
+            Ok(vec![])
+        }
+    }
 
     struct MockUowContext {
         user_repo: Arc<MockUserRepository>,
@@ -182,7 +197,7 @@ mod tests {
     }
 
     // ==========================================
-    // ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ
+    // Хелперы
     // ==========================================
 
     fn create_test_user(has_id: bool, trial_used: bool) -> User {
@@ -240,7 +255,7 @@ mod tests {
     }
 
     // ==========================================
-    // ТЕСТЫ
+    // Тесты
     // ==========================================
 
     #[tokio::test]

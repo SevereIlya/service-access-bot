@@ -4,6 +4,7 @@ use crate::domain::user::UserId;
 use crate::exec_query;
 use crate::infrastructure::database::{SharedTransaction, SqlxExecutor, SubscriptionRow};
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 use tracing::instrument;
 
@@ -50,6 +51,7 @@ impl SubscriptionRepository for SqlxSubscriptionRepository {
                 if let sqlx::Error::Database(db_err) = &e
                     && db_err.code().as_deref() == Some("23505")
                 {
+                    #[allow(clippy::single_match)]
                     match db_err.constraint() {
                         Some("idx_subscriptions_one_active") => {
                             return Err(DomainError::Subscription(
@@ -62,6 +64,33 @@ impl SubscriptionRepository for SqlxSubscriptionRepository {
                 Err(DomainError::SystemFailure(e.to_string()))
             }
         }
+    }
+
+    #[instrument(skip(self, sub), fields(user_id = %sub.user_id()))]
+    async fn update(&self, sub: &Subscription) -> DomainResult<()> {
+        let id = sub
+            .id()
+            .ok_or(DomainError::Subscription(SubscriptionError::EntityNotSaved))?;
+
+        let query = sqlx::query!(
+            r#"
+            UPDATE subscriptions
+            SET plan = $1,
+                expires_at = $2,
+                status = $3,
+                devices = $4
+            WHERE id = $5
+            "#,
+            sub.plan().as_str(),
+            sub.expires_at(),
+            sub.status().as_str(),
+            sub.devices().inner(),
+            id.inner(),
+        );
+
+        exec_query!(self.executor, query, execute)
+            .map_err(|e| DomainError::SystemFailure(e.to_string()))?;
+        Ok(())
     }
 
     #[instrument(skip(self))]
@@ -88,5 +117,45 @@ impl SubscriptionRepository for SqlxSubscriptionRepository {
         let sub: Option<Subscription> = row.map(TryInto::try_into).transpose()?;
 
         Ok(sub)
+    }
+
+    #[instrument(skip(self))]
+    async fn find_lapsed_active(&self) -> DomainResult<Vec<Subscription>> {
+        let query = sqlx::query_as!(
+            SubscriptionRow,
+            r#"
+            SELECT *
+            FROM subscriptions
+            WHERE status = 'active'
+              AND expires_at <= NOW()
+            "#
+        );
+
+        let rows: Vec<SubscriptionRow> = exec_query!(self.executor, query, fetch_all)
+            .map_err(|e| DomainError::SystemFailure(e.to_string()))?;
+        rows.into_iter().map(TryInto::try_into).collect()
+    }
+
+    #[instrument(skip(self))]
+    async fn find_expiring_between(
+        &self,
+        start: DateTime<Utc>,
+        end: DateTime<Utc>,
+    ) -> DomainResult<Vec<Subscription>> {
+        let query = sqlx::query_as!(
+            SubscriptionRow,
+            r#"
+            SELECT *
+            FROM subscriptions
+            WHERE status = 'active'
+              AND expires_at BETWEEN $1 AND $2
+            "#,
+            start,
+            end,
+        );
+
+        let rows: Vec<SubscriptionRow> = exec_query!(self.executor, query, fetch_all)
+            .map_err(|e| DomainError::SystemFailure(e.to_string()))?;
+        rows.into_iter().map(TryInto::try_into).collect()
     }
 }
