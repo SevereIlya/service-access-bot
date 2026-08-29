@@ -75,7 +75,7 @@ mod tests {
     use chrono::Months;
     use std::sync::{Arc, Mutex};
     use uuid::Uuid;
-
+    use crate::domain::vpn::{DynNodeRepository, DynVpnConnectionRepository};
     // ==========================================
     // Моки
     // ==========================================
@@ -162,6 +162,12 @@ mod tests {
         }
         fn subscriptions(&self) -> DynSubscriptionRepository {
             self.sub_repo.clone()
+        }
+        fn nodes(&self) -> DynNodeRepository {
+            unreachable!("nodes() не используется в этом юзкейсе")
+        }
+        fn vpn_connections(&self) -> DynVpnConnectionRepository {
+            unreachable!("vpn_connections() не используется в этом юзкейсе")
         }
         async fn commit(&mut self) -> DomainResult<()> {
             *self.committed.lock().unwrap() = true;

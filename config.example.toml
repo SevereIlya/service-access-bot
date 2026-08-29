@@ -9,27 +9,61 @@ uuid_namespace = "00000000-0000-0000-0000-000000000000"
 base_price = 000
 
 [payments.betatransfer]
-public_key = "0000000000000000000000000000000000000000000000000000000000000000"
-secret_key = "0000000000000000000000000000000000000000000000000000000000000000"
+public_key = "YOUR_PUBLIC_KEY"
+secret_key = "YOUR_SECRET_KEY"
 webhook_port = 8080
 ip_whitelist = [
     "0.0.0.0"
 ]
 
-[vpn.protocols.vless]
-port = 443
-public_key = "0000000000000000000000000000000000000000000"
-sni = "YOUR_DOMAIN"
-short_id = ["0000000000"]
+[vpn]
+template_path = "templates/config.yaml"
+
+# ==================== НОДА 1 ====================
 
 [[vpn.nodes]]
 name = "NAME"
 ip = "YOUR_IP"
-supported_protocols = ["vless", "wireguard"]
 
 [vpn.nodes.xui]
 base_url = "YOUR_3XUI_URL"
-username = "YOUR_NAME"
-password = "YOUR_PASSWORD"
+api_token = "YOUR_3XUI_API_TOKEN"
+
+[vpn.nodes.vless]
 inbound_id = 1
+port = 443
+public_key = "YOUR_PUBLIC_KEY"
+short_id = ["YOUR_SHORT_IDs"]
+sni = "YOUR_DOMAIN"
+flow = ""
+
+[vpn.nodes.hysteria2]
+inbound_id = 2
+port = 443
+sni = "YOUR_DOMAIN"
+obfs_password = "YOUR_PASSWORD"
+
+# ==================== НОДА 2 ====================
+
+[[vpn.nodes]]
+name = "NAME"
+ip = "YOUR_IP"
+
+[vpn.nodes.xui]
+base_url = "YOUR_3XUI_URL"
+api_token = "YOUR_3XUI_API_TOKEN"
+
+[vpn.nodes.vless]
+inbound_id = 1
+port = 443
+public_key = "YOUR_PUBLIC_KEY"
+short_id = ["YOUR_SHORT_IDs"]
+sni = "YOUR_DOMAIN"
+flow = ""
+
+[vpn.nodes.hysteria2]
+inbound_id = 2
+port = 443
+sni = "YOUR_DOMAIN"
+obfs_password = "YOUR_PASSWORD"
 

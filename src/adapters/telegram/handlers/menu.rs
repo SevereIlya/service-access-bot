@@ -4,10 +4,10 @@ use crate::adapters::telegram::views::message_error;
 use crate::adapters::telegram::{BotState, views};
 use crate::application::error::AppError;
 use crate::domain::error::DomainError;
-use teloxide::prelude::*;
-use teloxide::types::{MaybeInaccessibleMessage, ParseMode::Html};
-use tracing::warn;
 use crate::domain::error::UserError::NotFound;
+use teloxide::prelude::*;
+use teloxide::types::{InputFile, MaybeInaccessibleMessage, ParseMode::Html};
+use tracing::warn;
 
 #[allow(clippy::match_same_arms)] // Временно
 pub async fn handle_menu(
@@ -19,7 +19,7 @@ pub async fn handle_menu(
 ) -> TelegramResult<()> {
     match action {
         MenuAction::StartTrial => handle_start_trial(bot, msg, state).await?,
-        MenuAction::Router => {}
+        MenuAction::Router => handle_my_vpn(bot, msg, state).await?,
         MenuAction::Profile => {}
         MenuAction::Tariffs => {}
         MenuAction::Referral => {}
@@ -46,16 +46,14 @@ pub async fn handle_start_trial(
         // Мы хотим отправить юзеру сообщение. Отправив это сообщение, мы успешно обработали
         // ситуацию с точки зрения бота. Поэтому возвращаем Ok(())
         warn!(error = ?DomainError::User(NotFound), telegram_id, "Пользователь не найден");
-        let text =
-            message_error(&state.ui, &AppError::Domain(DomainError::User(NotFound)));
+        let text = message_error(&state.ui, &AppError::Domain(DomainError::User(NotFound)));
         bot.send_message(chat_id, text).await?;
         return Ok(());
     };
 
     match state.usecases.start_trial.execute(user).await {
         Ok(subscription) => {
-            let view =
-                views::build_trial_success_view(&state.ui, subscription.expires_at());
+            let view = views::build_trial_success_view(&state.ui, subscription.expires_at());
 
             let is_media = msg
                 .regular_message()
@@ -83,6 +81,53 @@ pub async fn handle_start_trial(
     Ok(())
 }
 
+pub async fn handle_my_vpn(
+    bot: Bot,
+    msg: MaybeInaccessibleMessage,
+    state: BotState,
+) -> TelegramResult<()> {
+    let chat_id = msg.chat().id;
+    let message_id = msg.id();
+    let telegram_id = chat_id.0;
+
+    let Some(user) = state.usecases.get_user.execute(telegram_id).await? else {
+        warn!(error = ?DomainError::User(NotFound), telegram_id, "Пользователь не найден");
+        let text = message_error(&state.ui, &AppError::Domain(DomainError::User(NotFound)));
+        bot.send_message(chat_id, text).await?;
+        return Ok(());
+    };
+
+    // Опционально: можно кинуть сообщение "Генерирую конфиг, подождите...",
+    // потому что походы по HTTP на ноды могут занять 2-3 секунды.
+    // Но пока просто идем в юзкейс.
+
+    match state.usecases.issue_vpn_config.execute(&user).await {
+        Ok(yaml_string) => {
+            let view = views::build_vpn_issued_view(&state.ui);
+
+            let _ = bot.delete_message(chat_id, message_id).await;
+
+            let file_name = format!("ParalinkVPN_{}.yaml", user.telegram_id().inner());
+
+            bot.send_document(
+                chat_id,
+                InputFile::memory(yaml_string.into_bytes()).file_name(file_name),
+            )
+            .caption(view.text)
+            .parse_mode(Html)
+            .reply_markup(view.keyboard)
+            .await?;
+        }
+        Err(e) => {
+            warn!(error = ?e, telegram_id, "Не удалось выдать VPN-конфиг");
+            let text = message_error(&state.ui, &e);
+            bot.send_message(chat_id, text).parse_mode(Html).await?;
+        }
+    }
+
+    Ok(())
+}
+
 pub async fn show_main_menu(
     bot: Bot,
     msg: MaybeInaccessibleMessage,
@@ -95,8 +140,7 @@ pub async fn show_main_menu(
 
     let Some(user) = state.usecases.get_user.execute(telegram_id).await? else {
         warn!(error = ?DomainError::User(NotFound), telegram_id, "Пользователь не найден");
-        let text =
-            message_error(&state.ui, &AppError::Domain(DomainError::User(NotFound)));
+        let text = message_error(&state.ui, &AppError::Domain(DomainError::User(NotFound)));
         bot.send_message(chat_id, text).await?;
         return Ok(());
     };

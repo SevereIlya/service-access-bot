@@ -2,13 +2,12 @@ use crate::domain::error::{DomainError, DomainResult};
 use crate::domain::subscription::DynSubscriptionRepository;
 use crate::domain::uow::{BoxedUowContext, UnitOfWork, UowContext};
 use crate::domain::user::DynUserRepository;
-use crate::infrastructure::database::{
-    SharedTransaction, SqlxSubscriptionRepository, SqlxUserRepository,
-};
+use crate::infrastructure::database::{SharedTransaction, SqlxNodeRepository, SqlxSubscriptionRepository, SqlxUserRepository, SqlxVpnConnectionRepository};
 use async_trait::async_trait;
 use sqlx::{PgPool, Postgres, Transaction};
 use std::sync::Arc;
 use tokio::sync::{Mutex, MutexGuard};
+use crate::domain::vpn::{DynNodeRepository, DynVpnConnectionRepository};
 
 pub struct SqlxUnitOfWork {
     pool: PgPool,
@@ -46,6 +45,14 @@ impl UowContext for SqlxUowContext {
 
     fn subscriptions(&self) -> DynSubscriptionRepository {
         Arc::new(SqlxSubscriptionRepository::transaction(self.tx.clone()))
+    }
+
+    fn nodes(&self) -> DynNodeRepository {
+        Arc::new(SqlxNodeRepository::transaction(self.tx.clone()))
+    }
+
+    fn vpn_connections(&self) -> DynVpnConnectionRepository {
+        Arc::new(SqlxVpnConnectionRepository::transaction(self.tx.clone()))
     }
 
     async fn commit(&mut self) -> DomainResult<()> {

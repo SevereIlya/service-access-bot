@@ -3,7 +3,8 @@ use crate::domain::subscription::{Subscription, SubscriptionDevices, Subscriptio
 use crate::domain::user::{
     DiscountPercent, Money, ReferralCode, SubscriptionToken, TelegramId, User, UserId,
 };
-use crate::infrastructure::database::{SubscriptionRow, UserRow};
+use crate::domain::vpn::{Node, NodeId, VpnConnection, VpnConnectionId};
+use crate::infrastructure::database::{NodeRow, SubscriptionRow, UserRow, VpnConnectionRow};
 
 impl TryFrom<UserRow> for User {
     type Error = DomainError;
@@ -39,6 +40,34 @@ impl TryFrom<SubscriptionRow> for Subscription {
             row.status.parse()?,
             SubscriptionDevices::new(row.devices)?,
             row.is_warning_sent,
+            row.created_at,
+        ))
+    }
+}
+
+impl TryFrom<NodeRow> for Node {
+    type Error = DomainError;
+
+    fn try_from(row: NodeRow) -> Result<Self, Self::Error> {
+        Ok(Self::restore_from_db(
+            NodeId::new(row.id),
+            row.name,
+            row.ip_address.parse()?,
+            row.is_active,
+            row.created_at,
+        ))
+    }
+}
+
+impl TryFrom<VpnConnectionRow> for VpnConnection {
+    type Error = DomainError;
+
+    fn try_from(row: VpnConnectionRow) -> Result<Self, Self::Error> {
+        Ok(Self::restore_from_db(
+            VpnConnectionId::new(row.id),
+            UserId::new(row.user_id),
+            NodeId::new(row.node_id),
+            row.is_synced,
             row.created_at,
         ))
     }

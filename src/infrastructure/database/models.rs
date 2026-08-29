@@ -30,3 +30,21 @@ pub struct SubscriptionRow {
     pub is_warning_sent: bool,
     pub created_at: DateTime<Utc>,
 }
+
+#[derive(Debug, FromRow)]
+pub struct NodeRow {
+    pub id: i64,
+    pub name: String,
+    pub ip_address: String,
+    pub is_active: bool,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, FromRow)]
+pub struct VpnConnectionRow {
+    pub id: i64,
+    pub user_id: i64,
+    pub node_id: i64,
+    pub is_synced: bool,
+    pub created_at: DateTime<Utc>,
+}

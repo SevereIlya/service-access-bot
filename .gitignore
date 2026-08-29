@@ -4,8 +4,9 @@
 
 # Папки
 /.idea/
-/locales/ru.toml
 /notes/
 /target/
 
 # Прочие файлы
+/locales/ru.toml
+/templates/config.yaml

@@ -34,42 +34,46 @@ pub struct BetatransferConfig {
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct VpnConfig {
+    pub template_path: String,
     pub nodes: Vec<VpnNodeConfig>,
-    pub protocols: ProtocolsConfig,
 }
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct VpnNodeConfig {
     pub name: String,
     pub ip: IpAddr,
-    pub supported_protocols: Vec<String>,
-    pub xui: Option<XuiConfig>,
+    pub xui: XuiConfig,
+    pub vless: Option<VlessConfig>,
+    pub hysteria2: Option<Hysteria2Config>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
-pub struct ProtocolsConfig {
-    pub vless: Option<VlessConfig>,
+pub struct XuiConfig {
+    pub base_url: String,
+    pub api_token: String,
 }
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct VlessConfig {
+    pub inbound_id: i32,
     pub port: u16,
     pub public_key: String,
-    pub sni: String,
     pub short_id: Vec<String>,
+    pub sni: String,
+    pub flow: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct Hysteria2Config {
+    pub inbound_id: i32,
+    pub port: u16,
+    pub sni: String,
+    pub obfs_password: String,
 }
 
 // ==============================================================================================
 //                                       БАЗОВЫЕ ШТУКИ
 // ==============================================================================================
-
-#[derive(Clone, Debug, Deserialize)]
-pub struct XuiConfig {
-    pub base_url: String,
-    pub username: String,
-    pub password: String,
-    pub inbound_id: i32,
-}
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct GeneralConfig {

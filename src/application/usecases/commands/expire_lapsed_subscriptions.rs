@@ -56,7 +56,7 @@ impl ExpireLapsedSubscriptionsCommand {
                 }
             };
 
-            if let Err(e) = self.vpn_revoker.revoke_all(user_id).await {
+            if let Err(e) = self.vpn_revoker.revoke_all(&user).await {
                 error!(user_id = %user_id, error = %e, "не удалось отключить VPN, повтор через час");
                 summary.failed += 1;
                 continue;
@@ -169,9 +169,9 @@ mod tests {
 
     #[async_trait]
     impl VpnAccessRevoker for MockVpnAccessRevoker {
-        async fn revoke_all(&self, user_id: UserId) -> DomainResult<()> {
-            self.calls.lock().unwrap().push(user_id);
-            if self.fail_for.contains(&user_id) {
+        async fn revoke_all(&self, user: &User) -> DomainResult<()> {
+            self.calls.lock().unwrap().push(user.id().unwrap());
+            if self.fail_for.contains(&user.id().unwrap()) {
                 return Err(DomainError::SystemFailure(
                     "vpn revoke failed (test)".into(),
                 ));

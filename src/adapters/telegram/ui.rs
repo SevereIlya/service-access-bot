@@ -17,6 +17,7 @@ pub struct MsgText {
     pub msg_unknown_command: String,
     pub msg_subscription_expiring: String,
     pub msg_subscription_expired: String,
+    pub msg_vpn_issued: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -38,6 +39,7 @@ pub struct ErrorText {
     pub err_has_sub: String,
     pub err_system_failure: String,
     pub err_internal: String,
+    pub err_no_active_subscription: String,
 }
 
 impl UiText {

@@ -1,17 +1,14 @@
 pub mod commands;
 pub mod queries;
 
-use crate::application::usecases::commands::expire_lapsed_subscriptions::ExpireLapsedSubscriptionsCommand;
-use crate::application::usecases::commands::register_user::RegisterUserCommand;
-use crate::application::usecases::commands::send_expiry_warnings::SendExpiryWarningsCommand;
-use crate::application::usecases::commands::start_trial::StartTrialCommand;
-use crate::application::usecases::queries::get_menu_state::GetMenuStateQuery;
-use crate::application::usecases::queries::get_user::GetUserQuery;
+pub use commands::*;
+pub use queries::*;
+
 use crate::domain::notification::DynNotifier;
 use crate::domain::subscription::DynSubscriptionRepository;
 use crate::domain::uow::DynUnitOfWork;
 use crate::domain::user::{DynUserRepository, Money};
-use crate::domain::vpn::DynVpnAccessRevoker;
+use crate::domain::vpn::{DynNodeRepository, DynVpnAccessRevoker, DynVpnConfigGenerator, DynVpnConnectionRepository, DynVpnProvisioner};
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -20,6 +17,7 @@ pub struct UseCases {
     pub start_trial: Arc<StartTrialCommand>,
     pub expire_lapsed_subscriptions: Arc<ExpireLapsedSubscriptionsCommand>,
     pub send_expiry_warnings: Arc<SendExpiryWarningsCommand>,
+    pub issue_vpn_config: Arc<IssueVpnConfigCommand>,
 
     pub get_user: Arc<GetUserQuery>,
     pub get_menu_state: Arc<GetMenuStateQuery>,
@@ -30,8 +28,12 @@ impl UseCases {
     pub fn new(
         user_repo: DynUserRepository,
         subscription_repo: DynSubscriptionRepository,
+        node_repo: DynNodeRepository,
+        vpn_connection_repo: DynVpnConnectionRepository,
         uow: DynUnitOfWork,
         vpn_revoker: DynVpnAccessRevoker,
+        vpn_provisioner: DynVpnProvisioner,
+        config_generator: DynVpnConfigGenerator,
         notifier: DynNotifier,
         uuid_namespace: Uuid,
         base_price: Money,
@@ -55,6 +57,13 @@ impl UseCases {
             user_repo.clone(),
             notifier,
         ));
+        let issue_vpn_config = Arc::new(IssueVpnConfigCommand::new(
+            subscription_repo.clone(),
+            node_repo,
+            vpn_connection_repo,
+            vpn_provisioner,
+            config_generator,
+        ));
 
         // === Querys ===
         let get_user = Arc::new(GetUserQuery::new(user_repo));
@@ -65,6 +74,7 @@ impl UseCases {
             start_trial,
             expire_lapsed_subscriptions,
             send_expiry_warnings,
+            issue_vpn_config,
             get_user,
             get_menu_state,
         }

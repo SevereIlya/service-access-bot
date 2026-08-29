@@ -5,6 +5,9 @@ pub type DomainResult<T> = Result<T, DomainError>;
 #[derive(Error, Debug)]
 pub enum DomainError {
     #[error(transparent)]
+    Node(#[from] NodeError),
+
+    #[error(transparent)]
     Subscription(#[from] SubscriptionError),
 
     #[error("System failure: {0}")]
@@ -12,6 +15,33 @@ pub enum DomainError {
 
     #[error(transparent)]
     User(#[from] UserError),
+}
+
+#[derive(Error, Debug)]
+pub enum NodeError {
+    #[error("Invalid IP address: {0}")]
+    InvalidIpAddress(String),
+}
+
+#[derive(Error, Debug)]
+pub enum SubscriptionError {
+    #[error("Already has active subscription")]
+    AlreadyHasActive,
+
+    #[error("Entity has no ID. It must be saved to the database first.")]
+    EntityNotSaved,
+
+    #[error("Invalid devices count: {0}")]
+    InvalidDevices(i32),
+
+    #[error("Invalid subscription plan: {0}")]
+    InvalidPlan(String),
+
+    #[error("Invalid subscription status: {0}")]
+    InvalidStatus(String),
+
+    #[error("No active subscription")]
+    NoActiveSubscription,
 }
 
 #[derive(Error, Debug)]
@@ -39,22 +69,4 @@ pub enum UserError {
 
     #[error("User not found")]
     NotFound,
-}
-
-#[derive(Error, Debug)]
-pub enum SubscriptionError {
-    #[error("Already has active subscription")]
-    AlreadyHasActive,
-
-    #[error("Entity has no ID. It must be saved to the database first.")]
-    EntityNotSaved,
-
-    #[error("Invalid devices count: {0}")]
-    InvalidDevices(i32),
-
-    #[error("Invalid subscription plan: {0}")]
-    InvalidPlan(String),
-
-    #[error("Invalid subscription status: {0}")]
-    InvalidStatus(String),
 }

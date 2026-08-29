@@ -6,6 +6,7 @@ msg_refresh_menu_view = "Main menu refreshed"
 msg_unknown_command = "️Send /start"
 msg_subscription_expiring = "Your subscription expiring"
 msg_subscription_expired = "Your subscription expired"
+msg_vpn_issued = "Your access"
 
 [button]
 btn_menu_trial = "Use trial"
@@ -23,3 +24,4 @@ err_trial_used = "Trial used"
 err_has_sub = "Has sub"
 err_system_failure = "System failure"
 err_internal = "Internal"
+err_no_active_subscription = "No active subscription"
