@@ -1,3 +1,4 @@
+use crate::domain::error::{DomainError, DomainResult};
 use crate::domain::vpn::{Node, VpnConfigGenerator};
 use crate::infrastructure::config::AppConfig;
 use serde::Serialize;
@@ -65,20 +66,31 @@ impl ClashConfigGenerator {
 }
 
 impl VpnConfigGenerator for ClashConfigGenerator {
-    fn generate(&self, nodes: &[&Node], user_uuid: Uuid) -> String {
+    fn generate(&self, nodes: &[&Node], user_uuid: Uuid) -> DomainResult<String> {
         let template_str = match read_to_string(&self.app_config.vpn.template_path) {
             Ok(content) => content,
             Err(e) => {
-                error!(error = %e, path = %self.app_config.vpn.template_path, "Не удалось прочитать шаблон конфига");
-                return "Ошибка генерации конфига: шаблон не найден".to_string();
+                error!(
+                    error = %e,
+                    path = %self.app_config.vpn.template_path,
+                    "Критическая ошибка: не удалось прочитать шаблон конфига с диска"
+                );
+                return Err(DomainError::SystemFailure(
+                    "Шаблон VPN конфига не найден".into(),
+                ));
             }
         };
 
         let mut config_tree: Value = match serde_yaml::from_str(&template_str) {
             Ok(val) => val,
             Err(e) => {
-                error!(error = %e, "Критическая ошибка: не удалось распарсить YAML шаблон");
-                return "Ошибка генерации конфига: сломан синтаксис YAML в шаблоне.".to_string();
+                error!(
+                    error = %e,
+                    "Критическая ошибка: не удалось распарсить YAML шаблон"
+                );
+                return Err(DomainError::SystemFailure(
+                    "Ошибка парсинга YAML шаблона".into(),
+                ));
             }
         };
 
@@ -164,6 +176,7 @@ impl VpnConfigGenerator for ClashConfigGenerator {
             }
         }
 
-        serde_yaml::to_string(&config_tree).unwrap_or_else(|_| "Ошибка сборки YAML".to_string())
+        serde_yaml::to_string(&config_tree)
+            .map_err(|e| DomainError::SystemFailure(format!("Ошибка сборки YAML: {}", e)))
     }
 }

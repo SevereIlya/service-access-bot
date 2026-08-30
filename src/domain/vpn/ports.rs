@@ -30,5 +30,5 @@ pub trait VpnProvisioner: Send + Sync {
 }
 
 pub trait VpnConfigGenerator: Send + Sync {
-    fn generate(&self, nodes: &[&Node], user_uuid: Uuid) -> String;
+    fn generate(&self, nodes: &[&Node], user_uuid: Uuid) -> DomainResult<String>;
 }
