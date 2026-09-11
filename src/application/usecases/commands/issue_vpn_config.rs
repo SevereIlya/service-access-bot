@@ -1,12 +1,12 @@
-use crate::application::error::{AppError, AppResult};
-use crate::domain::error::{
-    DomainError, SubscriptionError::NoActiveSubscription, UserError::EntityNotSaved,
-};
-use crate::domain::subscription::DynSubscriptionRepository;
-use crate::domain::user::User;
-use crate::domain::vpn::{
-    DynNodeRepository, DynVpnConfigGenerator, DynVpnConnectionRepository, DynVpnProvisioner,
-    VpnConnection,
+use crate::application::{AppError, AppResult};
+use crate::domain::{
+    DomainError, SubscriptionError, UserError,
+    subscription::DynSubscriptionRepository,
+    user::User,
+    vpn::{
+        DynNodeRepository, DynVpnConfigGenerator, DynVpnConnectionRepository, DynVpnProvisioner,
+        VpnConnection,
+    },
 };
 use tracing::{error, warn};
 
@@ -36,13 +36,11 @@ impl IssueVpnConfigCommand {
     }
 
     pub async fn execute(&self, user: &User) -> AppResult<String> {
-        let user_id = user.id().ok_or(DomainError::User(EntityNotSaved))?;
+        let user_id = user.id().ok_or(DomainError::User(UserError::EntityNotSaved))?;
 
-        let subscription = self
-            .subscription_repo
-            .find_active_by_user_id(user_id)
-            .await?
-            .ok_or(DomainError::Subscription(NoActiveSubscription))?;
+        let subscription = self.subscription_repo.find_active_by_user_id(user_id).await?.ok_or(
+            DomainError::Subscription(SubscriptionError::NoActiveSubscription),
+        )?;
         let devices = subscription.devices();
 
         let nodes = self.node_repo.find_active_nodes().await?;
@@ -103,15 +101,18 @@ impl IssueVpnConfigCommand {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::error::DomainResult;
-    use crate::domain::subscription::{
-        Subscription, SubscriptionDevices, SubscriptionPlan, SubscriptionRepository,
-        SubscriptionStatus,
-    };
-    use crate::domain::user::{Money, ReferralCode, SubscriptionToken, TelegramId, UserId};
-    use crate::domain::vpn::{
-        Node, NodeId, NodeIpAddress, NodeRepository, VpnConfigGenerator, VpnConnectionRepository,
-        VpnProvisioner,
+    use crate::domain::{
+        DomainResult,
+        billing::Money,
+        subscription::{
+            Subscription, SubscriptionDevices, SubscriptionPlan, SubscriptionRepository,
+            SubscriptionStatus,
+        },
+        user::{ReferralCode, SubscriptionToken, TelegramId, UserId},
+        vpn::{
+            Node, NodeId, NodeIpAddress, NodeRepository, VpnConfigGenerator,
+            VpnConnectionRepository, VpnProvisioner,
+        },
     };
     use async_trait::async_trait;
     use chrono::{Days, Utc};
@@ -321,7 +322,9 @@ mod tests {
 
         assert!(matches!(
             result,
-            Err(AppError::Domain(DomainError::User(EntityNotSaved)))
+            Err(AppError::Domain(DomainError::User(
+                UserError::EntityNotSaved
+            )))
         ));
         assert!(provision_calls.lock().unwrap().is_empty());
         assert!(upserted.lock().unwrap().is_empty());
@@ -339,7 +342,7 @@ mod tests {
         assert!(matches!(
             result,
             Err(AppError::Domain(DomainError::Subscription(
-                NoActiveSubscription
+                SubscriptionError::NoActiveSubscription
             )))
         ));
         assert!(

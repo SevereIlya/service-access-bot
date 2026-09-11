@@ -1,10 +1,10 @@
-use crate::domain::error::{DomainError, DomainResult};
-use crate::domain::user::UserId;
-use crate::domain::vpn::{NodeId, VpnConnection, VpnConnectionRepository};
-use crate::exec_query;
-use crate::infrastructure::database::{
-    SharedTransaction, SqlxExecutor, VpnConnectionRow,
+use crate::domain::{
+    DomainError, DomainResult,
+    user::UserId,
+    vpn::{NodeId, VpnConnection, VpnConnectionRepository},
 };
+use crate::exec_query;
+use crate::infrastructure::{SharedTransaction, SqlxExecutor, VpnConnectionRow};
 use async_trait::async_trait;
 use sqlx::PgPool;
 use tracing::instrument;
@@ -47,7 +47,6 @@ impl VpnConnectionRepository for SqlxVpnConnectionRepository {
 
         exec_query!(self.executor, query, execute)
             .map_err(|e| DomainError::SystemFailure(e.to_string()))?;
-
         Ok(())
     }
 
@@ -69,10 +68,8 @@ impl VpnConnectionRepository for SqlxVpnConnectionRepository {
             node_id.inner(),
         );
 
-        let row: Option<VpnConnectionRow> =
-            exec_query!(self.executor, query, fetch_optional)
-                .map_err(|e| DomainError::SystemFailure(e.to_string()))?;
-
+        let row: Option<VpnConnectionRow> = exec_query!(self.executor, query, fetch_optional)
+            .map_err(|e| DomainError::SystemFailure(e.to_string()))?;
         row.map(TryInto::try_into).transpose()
     }
 }

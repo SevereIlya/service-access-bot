@@ -1,10 +1,12 @@
-use crate::domain::error::DomainError;
-use crate::domain::subscription::{Subscription, SubscriptionDevices, SubscriptionId};
-use crate::domain::user::{
-    DiscountPercent, Money, ReferralCode, SubscriptionToken, TelegramId, User, UserId,
+use crate::domain::billing::TransactionId;
+use crate::domain::{
+    DomainError,
+    billing::{Money, Transaction},
+    subscription::{Subscription, SubscriptionDevices, SubscriptionId},
+    user::{DiscountPercent, ReferralCode, SubscriptionToken, TelegramId, User, UserId},
+    vpn::{Node, NodeId, VpnConnection, VpnConnectionId},
 };
-use crate::domain::vpn::{Node, NodeId, VpnConnection, VpnConnectionId};
-use crate::infrastructure::database::{NodeRow, SubscriptionRow, UserRow, VpnConnectionRow};
+use crate::infrastructure::{NodeRow, SubscriptionRow, TransactionRow, UserRow, VpnConnectionRow};
 
 impl TryFrom<UserRow> for User {
     type Error = DomainError;
@@ -68,6 +70,25 @@ impl TryFrom<VpnConnectionRow> for VpnConnection {
             UserId::new(row.user_id),
             NodeId::new(row.node_id),
             row.is_synced,
+            row.created_at,
+        ))
+    }
+}
+
+impl TryFrom<TransactionRow> for Transaction {
+    type Error = DomainError;
+
+    fn try_from(row: TransactionRow) -> Result<Self, Self::Error> {
+        Ok(Self::restore_from_db(
+            TransactionId::new(row.id),
+            UserId::new(row.user_id),
+            Money::new(row.amount)?,
+            row.kind.parse()?,
+            row.status.parse()?,
+            row.payment_provider.parse()?,
+            row.order_id,
+            row.provider_tx_id,
+            row.payload,
             row.created_at,
         ))
     }

@@ -1,12 +1,10 @@
-use crate::application::error::AppResult;
-use crate::domain::error::DomainError;
-use crate::domain::error::SubscriptionError::AlreadyHasActive;
-use crate::domain::error::UserError::EntityNotSaved;
-use crate::domain::subscription::{
-    Subscription, SubscriptionDevices, SubscriptionPlan, SubscriptionStatus,
+use crate::application::AppResult;
+use crate::domain::{
+    DomainError, SubscriptionError, UserError,
+    subscription::{Subscription, SubscriptionDevices, SubscriptionPlan, SubscriptionStatus},
+    uow::DynUnitOfWork,
+    user::User,
 };
-use crate::domain::uow::DynUnitOfWork;
-use crate::domain::user::User;
 use crate::in_transaction;
 use chrono::{Days, Utc};
 
@@ -20,11 +18,11 @@ impl StartTrialCommand {
     }
 
     pub async fn execute(&self, mut user: User) -> AppResult<Subscription> {
-        let id = user.id().ok_or(DomainError::User(EntityNotSaved))?;
+        let id = user.id().ok_or(DomainError::User(UserError::EntityNotSaved))?;
 
         in_transaction!(self.uow, |tx| {
             if tx.subscriptions().find_active_by_user_id(id).await?.is_some() {
-                return Err(DomainError::Subscription(AlreadyHasActive).into());
+                return Err(DomainError::Subscription(SubscriptionError::AlreadyHasActive).into());
             }
 
             user.use_trial()?;
@@ -53,29 +51,26 @@ impl StartTrialCommand {
     }
 }
 
-// ==============================================================================================
-//                                          ТЕСТЫ
-// ==============================================================================================
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::application::error::AppError;
-    use crate::domain::error::DomainResult;
-    use crate::domain::error::UserError::TrialAlreadyUsed;
-    use crate::domain::subscription::{
-        DynSubscriptionRepository, SubscriptionRepository,
-    };
-    use crate::domain::uow::{BoxedUowContext, UnitOfWork, UowContext};
-    use crate::domain::user::{
-        DynUserRepository, Money, ReferralCode, SubscriptionToken, TelegramId, UserId,
-        UserRepository,
+    use crate::application::AppError;
+    use crate::domain::{
+        DomainResult,
+        billing::Money,
+        subscription::{DynSubscriptionRepository, SubscriptionRepository},
+        uow::{BoxedUowContext, UnitOfWork, UowContext},
+        user::{
+            DynUserRepository, ReferralCode, SubscriptionToken, TelegramId, UserId,
+            UserRepository,
+        },
+        vpn::{DynNodeRepository, DynVpnConnectionRepository},
     };
     use async_trait::async_trait;
     use chrono::Months;
     use std::sync::{Arc, Mutex};
     use uuid::Uuid;
-    use crate::domain::vpn::{DynNodeRepository, DynVpnConnectionRepository};
+    use crate::domain::billing::DynTransactionRepository;
     // ==========================================
     // Моки
     // ==========================================
@@ -101,6 +96,9 @@ mod tests {
             _telegram_id: TelegramId,
         ) -> DomainResult<Option<User>> {
             Ok(None)
+        }
+        async fn find_by_subscription_token(&self, _token: &SubscriptionToken) -> DomainResult<Option<User>> {
+            unreachable!("find_by_subscription_token() не используется в этом юзкейсе")
         }
     }
 
@@ -168,6 +166,9 @@ mod tests {
         }
         fn vpn_connections(&self) -> DynVpnConnectionRepository {
             unreachable!("vpn_connections() не используется в этом юзкейсе")
+        }
+        fn transactions(&self) -> DynTransactionRepository {
+            unreachable!("transactions() не используется в этом юзкейсе")
         }
         async fn commit(&mut self) -> DomainResult<()> {
             *self.committed.lock().unwrap() = true;
@@ -324,7 +325,7 @@ mod tests {
         assert!(result.is_err());
         assert!(matches!(
             result.unwrap_err(),
-            AppError::Domain(DomainError::User(EntityNotSaved))
+            AppError::Domain(DomainError::User(UserError::EntityNotSaved))
         ));
 
         assert!(
@@ -342,7 +343,7 @@ mod tests {
         assert!(result.is_err());
         assert!(matches!(
             result.unwrap_err(),
-            AppError::Domain(DomainError::User(TrialAlreadyUsed))
+            AppError::Domain(DomainError::User(UserError::TrialAlreadyUsed))
         ));
         assert!(
             !*committed.lock().unwrap(),
@@ -359,7 +360,9 @@ mod tests {
         assert!(result.is_err());
         assert!(matches!(
             result.unwrap_err(),
-            AppError::Domain(DomainError::Subscription(AlreadyHasActive))
+            AppError::Domain(DomainError::Subscription(
+                SubscriptionError::AlreadyHasActive
+            ))
         ));
         assert!(
             *rolled_back.lock().unwrap(),

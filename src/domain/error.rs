@@ -5,6 +5,9 @@ pub type DomainResult<T> = Result<T, DomainError>;
 #[derive(Error, Debug)]
 pub enum DomainError {
     #[error(transparent)]
+    Billing(#[from] BillingError),
+
+    #[error(transparent)]
     Node(#[from] NodeError),
 
     #[error(transparent)]
@@ -15,6 +18,27 @@ pub enum DomainError {
 
     #[error(transparent)]
     User(#[from] UserError),
+}
+
+#[derive(Error, Debug)]
+pub enum BillingError {
+    #[error("Entity has no ID. It must be saved to the database first.")]
+    EntityNotSaved,
+
+    #[error("Insufficient balance")]
+    InsufficientBalance,
+
+    #[error("Invalid amount: {0}")]
+    InvalidAmount(i64),
+
+    #[error("Invalid payment provider: {0}")]
+    InvalidPaymentProvider(String),
+
+    #[error("Invalid transaction status: {0}")]
+    InvalidTransactionStatus(String),
+
+    #[error("Invalid transaction kind: {0}")]
+    InvalidTransactionKind(String),
 }
 
 #[derive(Error, Debug)]

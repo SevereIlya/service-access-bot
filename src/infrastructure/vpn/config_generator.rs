@@ -1,6 +1,8 @@
-use crate::domain::error::{DomainError, DomainResult};
-use crate::domain::vpn::{Node, VpnConfigGenerator};
-use crate::infrastructure::config::AppConfig;
+use crate::domain::{
+    DomainError, DomainResult,
+    vpn::{Node, VpnConfigGenerator},
+};
+use crate::infrastructure::AppConfig;
 use serde::Serialize;
 use serde_yaml::{Sequence, Value};
 use std::fs::read_to_string;
@@ -177,6 +179,6 @@ impl VpnConfigGenerator for ClashConfigGenerator {
         }
 
         serde_yaml::to_string(&config_tree)
-            .map_err(|e| DomainError::SystemFailure(format!("Ошибка сборки YAML: {}", e)))
+            .map_err(|e| DomainError::SystemFailure(format!("Ошибка сборки YAML: {e}")))
     }
 }

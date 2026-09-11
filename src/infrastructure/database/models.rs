@@ -48,3 +48,17 @@ pub struct VpnConnectionRow {
     pub is_synced: bool,
     pub created_at: DateTime<Utc>,
 }
+
+#[derive(Debug, FromRow)]
+pub struct TransactionRow {
+    pub id: i64,
+    pub user_id: i64,
+    pub amount: i64,
+    pub kind: String,
+    pub status: String,
+    pub payment_provider: String,
+    pub order_id: String,
+    pub provider_tx_id: Option<String>,
+    pub payload: Option<serde_json::Value>,
+    pub created_at: DateTime<Utc>,
+}

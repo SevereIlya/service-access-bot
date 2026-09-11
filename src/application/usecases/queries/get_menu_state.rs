@@ -1,8 +1,5 @@
-use crate::application::error::AppResult;
-use crate::domain::error::DomainError;
-use crate::domain::error::UserError::EntityNotSaved;
-use crate::domain::subscription::DynSubscriptionRepository;
-use crate::domain::user::User;
+use crate::application::AppResult;
+use crate::domain::{DomainError, UserError, subscription::DynSubscriptionRepository, user::User};
 
 pub struct MenuState {
     pub can_trial: bool,
@@ -22,7 +19,7 @@ impl GetMenuStateQuery {
             return Ok(MenuState { can_trial: false });
         }
 
-        let id = user.id().ok_or(DomainError::User(EntityNotSaved))?;
+        let id = user.id().ok_or(DomainError::User(UserError::EntityNotSaved))?;
         let has_active_sub = self.sub_repo.find_active_by_user_id(id).await?.is_some();
 
         Ok(MenuState {
@@ -31,26 +28,22 @@ impl GetMenuStateQuery {
     }
 }
 
-// ==============================================================================================
-//                                          ТЕСТЫ
-// ==============================================================================================
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::{
+        DomainResult,
+        billing::Money,
+        subscription::{
+            Subscription, SubscriptionDevices, SubscriptionPlan, SubscriptionRepository,
+            SubscriptionStatus,
+        },
+        user::{ReferralCode, SubscriptionToken, TelegramId, UserId},
+    };
     use async_trait::async_trait;
     use chrono::{Days, Utc};
     use std::sync::Arc;
     use uuid::Uuid;
-
-    use crate::domain::error::DomainResult;
-    use crate::domain::subscription::{
-        Subscription, SubscriptionDevices, SubscriptionPlan, SubscriptionRepository,
-        SubscriptionStatus,
-    };
-    use crate::domain::user::{
-        Money, ReferralCode, SubscriptionToken, TelegramId, UserId,
-    };
 
     // ==========================================
     // Моки
@@ -65,22 +58,18 @@ mod tests {
         async fn create(&self, _subscription: &Subscription) -> DomainResult<()> {
             unreachable!("create() не используется в этом юзкейсе")
         }
-
         async fn update(&self, _subscription: &Subscription) -> DomainResult<()> {
             unreachable!("update() не используется в этом юзкейсе")
         }
-
         async fn find_active_by_user_id(
             &self,
             _user_id: UserId,
         ) -> DomainResult<Option<Subscription>> {
             Ok(self.active_sub_to_return.clone())
         }
-
         async fn find_lapsed_active(&self) -> DomainResult<Vec<Subscription>> {
             unreachable!("find_lapsed_active() не используется в этом юзкейсе")
         }
-
         async fn find_due_for_expiry_warning(&self) -> DomainResult<Vec<Subscription>> {
             unreachable!("find_expiring_between() не используется в этом юзкейсе")
         }

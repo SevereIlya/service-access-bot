@@ -1,20 +1,21 @@
 [general]
 database_url = "postgres://user:pass@localhost/db"
-publicbase_url = "https://YOUR_DOMAIN"
+public_base_url = "https://YOUR_DOMAIN"
 telegram_token = "YOUR_TELEGRAM_TOKEN"
+web_port = 8080
 admin_chat_id = 000000000
 uuid_namespace = "00000000-0000-0000-0000-000000000000"
 
 [payments]
 base_price = 000
 
-[payments.betatransfer]
-public_key = "YOUR_PUBLIC_KEY"
-secret_key = "YOUR_SECRET_KEY"
-webhook_port = 8080
-ip_whitelist = [
-    "0.0.0.0"
-]
+[payments.platega]
+base_url = ""
+merchant_id = ""
+secret = ""
+success_url = ""
+failed_url = ""
+webhook_allowed_ip = ["0.0.0.0"]
 
 [vpn]
 template_path = "templates/config.yaml"

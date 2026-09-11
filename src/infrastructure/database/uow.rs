@@ -1,13 +1,19 @@
-use crate::domain::error::{DomainError, DomainResult};
-use crate::domain::subscription::DynSubscriptionRepository;
-use crate::domain::uow::{BoxedUowContext, UnitOfWork, UowContext};
-use crate::domain::user::DynUserRepository;
-use crate::infrastructure::database::{SharedTransaction, SqlxNodeRepository, SqlxSubscriptionRepository, SqlxUserRepository, SqlxVpnConnectionRepository};
+use crate::domain::{
+    DomainError, DomainResult,
+    billing::DynTransactionRepository,
+    subscription::DynSubscriptionRepository,
+    uow::{BoxedUowContext, UnitOfWork, UowContext},
+    user::DynUserRepository,
+    vpn::{DynNodeRepository, DynVpnConnectionRepository},
+};
+use crate::infrastructure::{
+    SharedTransaction, SqlxNodeRepository, SqlxSubscriptionRepository, SqlxTransactionRepository,
+    SqlxUserRepository, SqlxVpnConnectionRepository,
+};
 use async_trait::async_trait;
 use sqlx::{PgPool, Postgres, Transaction};
 use std::sync::Arc;
 use tokio::sync::{Mutex, MutexGuard};
-use crate::domain::vpn::{DynNodeRepository, DynVpnConnectionRepository};
 
 pub struct SqlxUnitOfWork {
     pool: PgPool,
@@ -23,11 +29,8 @@ impl SqlxUnitOfWork {
 #[async_trait]
 impl UnitOfWork for SqlxUnitOfWork {
     async fn begin(&self) -> DomainResult<BoxedUowContext> {
-        let tx: Transaction<Postgres> = self
-            .pool
-            .begin()
-            .await
-            .map_err(|e| DomainError::SystemFailure(e.to_string()))?;
+        let tx: Transaction<Postgres> =
+            self.pool.begin().await.map_err(|e| DomainError::SystemFailure(e.to_string()))?;
         let shared_tx = Arc::new(Mutex::new(Some(tx)));
         Ok(Box::new(SqlxUowContext { tx: shared_tx }))
     }
@@ -53,6 +56,9 @@ impl UowContext for SqlxUowContext {
 
     fn vpn_connections(&self) -> DynVpnConnectionRepository {
         Arc::new(SqlxVpnConnectionRepository::transaction(self.tx.clone()))
+    }
+    fn transactions(&self) -> DynTransactionRepository {
+        Arc::new(SqlxTransactionRepository::transaction(self.tx.clone()))
     }
 
     async fn commit(&mut self) -> DomainResult<()> {

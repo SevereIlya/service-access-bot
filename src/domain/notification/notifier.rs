@@ -1,4 +1,4 @@
-use crate::domain::error::DomainResult;
+use crate::domain::DomainResult;
 use crate::domain::user::User;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -9,7 +9,6 @@ pub type DynNotifier = Arc<dyn Notifier + Send + Sync>;
 /// Порт для отправки пользователю уведомлений о событиях, не связанных с его текущим диалогом.
 #[async_trait]
 pub trait Notifier: Send + Sync {
-
     /// Уведомляет пользователя об истечении подписки.
     async fn notify_subscription_expired(&self, user: &User) -> DomainResult<()>;
 

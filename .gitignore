@@ -4,6 +4,7 @@
 
 # Папки
 /.idea/
+/.sqlx/
 /notes/
 /target/
 

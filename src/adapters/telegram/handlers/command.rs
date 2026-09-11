@@ -1,7 +1,4 @@
-use crate::adapters::telegram::commands::Command;
-use crate::adapters::telegram::error::TelegramResult;
-use crate::adapters::telegram::views::message_error;
-use crate::adapters::telegram::{BotState, views};
+use crate::adapters::telegram::{BotState, Command, TelegramResult, message_error, views};
 use crate::domain::user::User;
 use teloxide::prelude::*;
 use teloxide::types::ParseMode::Html;
@@ -26,14 +23,12 @@ pub async fn handle_commands(
                 .collect::<Vec<_>>()
                 .join(" ");
 
-            match state.usecases.register_user.execute(telegram_id, username, full_name).await
-            {
+            match state.usecases.register_user.execute(telegram_id, username, full_name).await {
                 Ok(user) => {
                     // TODO: Тут будет проверка рефералки try_process_referral
 
                     let menu_state = state.usecases.get_menu_state.execute(&user).await?;
-                    let view =
-                        views::build_start_message(&state.ui, menu_state.can_trial);
+                    let view = views::build_start_message(&state.ui_text, menu_state.can_trial);
                     bot.send_message(chat_id, view.text)
                         .parse_mode(Html)
                         .reply_markup(view.keyboard)
@@ -41,7 +36,7 @@ pub async fn handle_commands(
                 }
                 Err(e) => {
                     error!(error = ?e, "Ошибка при обработке /start");
-                    let text = message_error(&state.ui, &e);
+                    let text = message_error(&state.ui_text, &e);
                     bot.send_message(chat_id, text).parse_mode(Html).await?;
                 }
             }

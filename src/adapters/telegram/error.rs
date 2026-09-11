@@ -1,13 +1,13 @@
+use crate::application::AppError;
 use thiserror::Error;
-use crate::application::error::AppError;
+
+pub type TelegramResult<T> = Result<T, TelegramError>;
 
 #[derive(Error, Debug)]
 pub enum TelegramError {
     #[error("Telegram API error: {0}")]
     Api(#[from] teloxide::RequestError),
 
-    #[error("Business logic error: {0}")]
+    #[error(transparent)]
     App(#[from] AppError),
 }
-
-pub type TelegramResult<T> = Result<T, TelegramError>;

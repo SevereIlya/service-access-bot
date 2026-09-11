@@ -1,7 +1,10 @@
-use crate::domain::error::DomainResult;
-use crate::domain::subscription::repository::DynSubscriptionRepository;
-use crate::domain::user::repository::DynUserRepository;
-use crate::domain::vpn::{DynNodeRepository, DynVpnConnectionRepository};
+use crate::domain::{
+    DomainResult,
+    billing::DynTransactionRepository,
+    subscription::DynSubscriptionRepository,
+    user::DynUserRepository,
+    vpn::{DynNodeRepository, DynVpnConnectionRepository},
+};
 use async_trait::async_trait;
 use std::sync::Arc;
 
@@ -18,6 +21,7 @@ pub trait UowContext: Send + Sync {
     fn subscriptions(&self) -> DynSubscriptionRepository;
     fn nodes(&self) -> DynNodeRepository;
     fn vpn_connections(&self) -> DynVpnConnectionRepository;
+    fn transactions(&self) -> DynTransactionRepository;
 
     async fn commit(&mut self) -> DomainResult<()>;
     async fn rollback(&mut self) -> DomainResult<()>;

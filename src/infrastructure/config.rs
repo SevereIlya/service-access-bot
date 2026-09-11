@@ -17,15 +17,17 @@ pub struct AppConfig {
 #[derive(Clone, Debug, Deserialize)]
 pub struct PaymentsConfig {
     pub base_price: i64,
-    pub betatransfer: BetatransferConfig,
+    pub platega: PlategaConfig,
 }
 
 #[derive(Clone, Debug, Deserialize)]
-pub struct BetatransferConfig {
-    pub public_key: String,
-    pub secret_key: String,
-    pub ip_whitelist: Vec<IpAddr>,
-    pub webhook_port: u16,
+pub struct PlategaConfig {
+    pub base_url: String,
+    pub merchant_id: String,
+    pub secret: String,
+    pub success_url: String,
+    pub failed_url: String,
+    pub webhook_allowed_ip: Vec<IpAddr>,
 }
 
 // ==============================================================================================
@@ -78,8 +80,9 @@ pub struct Hysteria2Config {
 #[derive(Clone, Debug, Deserialize)]
 pub struct GeneralConfig {
     pub database_url: String,
-    pub publicbase_url: String,
+    pub public_base_url: String,
     pub telegram_token: String,
+    pub web_port: u16,
     pub admin_chat_id: i64,
     pub uuid_namespace: Uuid,
 }

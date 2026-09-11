@@ -1,7 +1,4 @@
-use crate::domain::error::DomainResult;
-use crate::domain::subscription::SubscriptionDevices;
-use crate::domain::user::User;
-use crate::domain::vpn::Node;
+use crate::domain::{DomainResult, subscription::SubscriptionDevices, user::User, vpn::Node};
 use async_trait::async_trait;
 use std::sync::Arc;
 use uuid::Uuid;

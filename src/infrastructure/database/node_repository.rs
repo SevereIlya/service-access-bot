@@ -1,10 +1,12 @@
+use crate::domain::{
+    DomainError, DomainResult,
+    vpn::{Node, NodeRepository},
+};
+use crate::exec_query;
+use crate::infrastructure::{NodeRow, SharedTransaction, SqlxExecutor};
 use async_trait::async_trait;
-use crate::infrastructure::database::{NodeRow, SharedTransaction, SqlxExecutor};
 use sqlx::PgPool;
 use tracing::instrument;
-use crate::domain::error::{DomainError, DomainResult};
-use crate::domain::vpn::{Node, NodeRepository};
-use crate::exec_query;
 
 pub struct SqlxNodeRepository {
     executor: SqlxExecutor,
@@ -40,7 +42,6 @@ impl NodeRepository for SqlxNodeRepository {
 
         let rows: Vec<NodeRow> = exec_query!(self.executor, query, fetch_all)
             .map_err(|e| DomainError::SystemFailure(e.to_string()))?;
-
         rows.into_iter().map(TryInto::try_into).collect()
     }
 }

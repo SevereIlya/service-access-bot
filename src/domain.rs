@@ -4,3 +4,6 @@ pub mod subscription;
 pub mod uow;
 pub mod user;
 pub mod vpn;
+pub mod billing;
+
+pub use error::*;

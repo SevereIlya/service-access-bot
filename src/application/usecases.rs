@@ -4,11 +4,17 @@ pub mod queries;
 pub use commands::*;
 pub use queries::*;
 
-use crate::domain::notification::DynNotifier;
-use crate::domain::subscription::DynSubscriptionRepository;
-use crate::domain::uow::DynUnitOfWork;
-use crate::domain::user::{DynUserRepository, Money};
-use crate::domain::vpn::{DynNodeRepository, DynVpnAccessRevoker, DynVpnConfigGenerator, DynVpnConnectionRepository, DynVpnProvisioner};
+use crate::domain::{
+    billing::{DynPaymentGateway, DynTransactionRepository, Money},
+    notification::DynNotifier,
+    subscription::DynSubscriptionRepository,
+    uow::DynUnitOfWork,
+    user::DynUserRepository,
+    vpn::{
+        DynNodeRepository, DynVpnAccessRevoker, DynVpnConfigGenerator, DynVpnConnectionRepository,
+        DynVpnProvisioner,
+    },
+};
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -18,9 +24,13 @@ pub struct UseCases {
     pub expire_lapsed_subscriptions: Arc<ExpireLapsedSubscriptionsCommand>,
     pub send_expiry_warnings: Arc<SendExpiryWarningsCommand>,
     pub issue_vpn_config: Arc<IssueVpnConfigCommand>,
+    pub request_top_up: Arc<RequestTopUpCommand>,
+    pub process_payment_webhook: Arc<ProcessPaymentWebhookCommand>,
 
-    pub get_user: Arc<GetUserQuery>,
     pub get_menu_state: Arc<GetMenuStateQuery>,
+    pub get_profile: Arc<GetProfileQuery>,
+    pub get_user_by_telegram_id: Arc<GetUserByTelegramIdQuery>,
+    pub get_user_by_subscription_token: Arc<GetUserBySubscriptionTokenQuery>,
 }
 
 impl UseCases {
@@ -30,10 +40,12 @@ impl UseCases {
         subscription_repo: DynSubscriptionRepository,
         node_repo: DynNodeRepository,
         vpn_connection_repo: DynVpnConnectionRepository,
+        transaction_repo: DynTransactionRepository,
         uow: DynUnitOfWork,
         vpn_revoker: DynVpnAccessRevoker,
         vpn_provisioner: DynVpnProvisioner,
         config_generator: DynVpnConfigGenerator,
+        payment_gateway: DynPaymentGateway,
         notifier: DynNotifier,
         uuid_namespace: Uuid,
         base_price: Money,
@@ -45,13 +57,12 @@ impl UseCases {
             base_price,
         ));
         let start_trial = Arc::new(StartTrialCommand::new(uow));
-        let expire_lapsed_subscriptions =
-            Arc::new(ExpireLapsedSubscriptionsCommand::new(
-                subscription_repo.clone(),
-                user_repo.clone(),
-                vpn_revoker,
-                notifier.clone(),
-            ));
+        let expire_lapsed_subscriptions = Arc::new(ExpireLapsedSubscriptionsCommand::new(
+            subscription_repo.clone(),
+            user_repo.clone(),
+            vpn_revoker,
+            notifier.clone(),
+        ));
         let send_expiry_warnings = Arc::new(SendExpiryWarningsCommand::new(
             subscription_repo.clone(),
             user_repo.clone(),
@@ -64,10 +75,21 @@ impl UseCases {
             vpn_provisioner,
             config_generator,
         ));
+        let request_top_up = Arc::new(RequestTopUpCommand::new(
+            transaction_repo.clone(),
+            payment_gateway.clone(),
+        ));
+        let process_payment_webhook = Arc::new(ProcessPaymentWebhookCommand::new(
+            transaction_repo,
+            payment_gateway,
+        ));
 
         // === Querys ===
-        let get_user = Arc::new(GetUserQuery::new(user_repo));
-        let get_menu_state = Arc::new(GetMenuStateQuery::new(subscription_repo));
+        let get_user_by_telegram_id = Arc::new(GetUserByTelegramIdQuery::new(user_repo.clone()));
+        let get_menu_state = Arc::new(GetMenuStateQuery::new(subscription_repo.clone()));
+        let get_profile = Arc::new(GetProfileQuery::new(subscription_repo));
+        let get_user_by_subscription_token =
+            Arc::new(GetUserBySubscriptionTokenQuery::new(user_repo));
 
         Self {
             register_user,
@@ -75,8 +97,12 @@ impl UseCases {
             expire_lapsed_subscriptions,
             send_expiry_warnings,
             issue_vpn_config,
-            get_user,
+            request_top_up,
+            process_payment_webhook,
             get_menu_state,
+            get_profile,
+            get_user_by_telegram_id,
+            get_user_by_subscription_token,
         }
     }
 }

@@ -1,33 +1,10 @@
-use crate::domain::error::{DomainError, DomainResult, UserError};
+use crate::domain::{DomainError, DomainResult, UserError};
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct UserId(i64);
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct TelegramId(i64);
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct ReferralCode(String);
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct SubscriptionToken(String);
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct DiscountPercent(u8);
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Money(i64);
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum UserRole {
-    User,
-    Admin,
-}
-
-// ============================================================================================== //
 
 impl UserId {
     #[must_use]
@@ -47,6 +24,9 @@ impl Display for UserId {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct TelegramId(i64);
+
 impl TelegramId {
     #[must_use]
     pub const fn new(id: i64) -> Self {
@@ -64,6 +44,9 @@ impl Display for TelegramId {
         write!(f, "{}", self.0)
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ReferralCode(String);
 
 impl ReferralCode {
     #[must_use]
@@ -87,6 +70,9 @@ impl ReferralCode {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct SubscriptionToken(String);
+
 impl SubscriptionToken {
     #[must_use]
     pub const fn new(token: String) -> Self {
@@ -103,6 +89,9 @@ impl SubscriptionToken {
         &self.0
     }
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct DiscountPercent(u8);
 
 impl DiscountPercent {
     pub fn new(value: i32) -> DomainResult<Self> {
@@ -124,24 +113,10 @@ impl DiscountPercent {
     }
 }
 
-impl Money {
-    pub fn new(value: i64) -> DomainResult<Self> {
-        if value < 0 {
-            return Err(UserError::InvalidMoney(value).into());
-        }
-        Ok(Self(value))
-    }
-
-    #[must_use]
-    pub const fn inner(&self) -> i64 {
-        self.0
-    }
-}
-
-impl Display for Money {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UserRole {
+    User,
+    Admin,
 }
 
 impl UserRole {
@@ -165,10 +140,6 @@ impl FromStr for UserRole {
         }
     }
 }
-
-// ==============================================================================================
-//                                          ТЕСТЫ
-// ==============================================================================================
 
 #[cfg(test)]
 mod tests {
@@ -269,28 +240,6 @@ mod tests {
         ));
     }
 
-    // --- Money ---
-    #[test]
-    fn test_money_valid() {
-        let m1 = Money::new(0).unwrap();
-        assert_eq!(m1.inner(), 0);
-        assert_eq!(m1.to_string(), "0");
-
-        let m2 = Money::new(10500).unwrap();
-        assert_eq!(m2.inner(), 10500);
-        assert_eq!(m2.to_string(), "10500");
-    }
-
-    #[test]
-    fn test_money_invalid() {
-        let result = Money::new(-1);
-        assert!(result.is_err());
-        assert!(matches!(
-            result.unwrap_err(),
-            DomainError::User(UserError::InvalidMoney(-1))
-        ));
-    }
-
     // --- UserRole ---
     #[test]
     fn test_user_role_as_str() {
@@ -310,7 +259,10 @@ mod tests {
         assert!(result.is_err());
 
         match result.unwrap_err() {
-            DomainError::User(UserError::InvalidRole(role)) => { assert_eq!(role, "superuser") } _ => panic!("Ожидалась ошибка UserError::InvalidRole"),
+            DomainError::User(UserError::InvalidRole(role)) => {
+                assert_eq!(role, "superuser")
+            }
+            _ => panic!("Ожидалась ошибка UserError::InvalidRole"),
         }
     }
 }

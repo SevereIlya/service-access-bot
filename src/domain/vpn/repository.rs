@@ -1,6 +1,8 @@
-use crate::domain::error::DomainResult;
-use crate::domain::user::UserId;
-use crate::domain::vpn::{Node, NodeId, VpnConnection};
+use crate::domain::{
+    DomainResult,
+    user::UserId,
+    vpn::{Node, NodeId, VpnConnection},
+};
 use async_trait::async_trait;
 use std::sync::Arc;
 

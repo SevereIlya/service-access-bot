@@ -1,6 +1,4 @@
-use super::entity::Subscription;
-use crate::domain::error::DomainResult;
-use crate::domain::user::UserId;
+use crate::domain::{DomainResult, subscription::Subscription, user::UserId};
 use async_trait::async_trait;
 use std::sync::Arc;
 
@@ -22,10 +20,7 @@ pub trait SubscriptionRepository: Send + Sync {
     /// Возвращает активную подписку пользователя, если она существует.
     ///
     /// Подписка считается активной, если её статус равен `Active` и срок действия ещё не истёк.
-    async fn find_active_by_user_id(
-        &self,
-        user_id: UserId,
-    ) -> DomainResult<Option<Subscription>>;
+    async fn find_active_by_user_id(&self, user_id: UserId) -> DomainResult<Option<Subscription>>;
 
     /// Возвращает подписки со статусом `Active`, срок действия которых уже истёк.
     async fn find_lapsed_active(&self) -> DomainResult<Vec<Subscription>>;

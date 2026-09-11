@@ -1,6 +1,7 @@
-use crate::domain::error::{DomainError, DomainResult, UserError};
-use crate::domain::user::{
-    DiscountPercent, Money, ReferralCode, SubscriptionToken, TelegramId, UserId, UserRole,
+use crate::domain::{
+    DomainError, DomainResult, UserError,
+    billing::Money,
+    user::{DiscountPercent, ReferralCode, SubscriptionToken, TelegramId, UserId, UserRole},
 };
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
@@ -163,7 +164,6 @@ impl User {
         self.full_name = full_name;
     }
 }
-
 
 #[cfg(test)]
 mod tests {

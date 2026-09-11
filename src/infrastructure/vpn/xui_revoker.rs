@@ -1,8 +1,5 @@
-use crate::domain::error::{DomainError, DomainResult};
-use crate::domain::user::User;
-use crate::domain::vpn::VpnAccessRevoker;
-use crate::infrastructure::config::AppConfig;
-use crate::infrastructure::vpn::XuiClient;
+use crate::domain::{DomainError, DomainResult, user::User, vpn::VpnAccessRevoker};
+use crate::infrastructure::{AppConfig, XuiClient};
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::Arc;

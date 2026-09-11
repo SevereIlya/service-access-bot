@@ -1,34 +1,35 @@
-use crate::adapters::telegram::callbacks::CallbackAction;
-use crate::adapters::telegram::error::TelegramResult;
-use crate::adapters::telegram::handlers::menu::handle_menu;
-use crate::adapters::telegram::BotState;
+use crate::adapters::telegram::{
+    BotState, CallbackAction, TelegramResult, handlers::menu, handlers::purchase,
+};
 use teloxide::prelude::*;
-use tracing::{info, warn, instrument};
+use tracing::{info, instrument, warn};
 
 #[instrument(skip_all, fields(telegram_id = qry.from.id.0))]
-pub async fn callback_handler(
-    bot: Bot,
-    qry: CallbackQuery,
-    state: BotState,
-) -> TelegramResult<()> {
+pub async fn callback_handler(bot: Bot, qry: CallbackQuery, state: BotState) -> TelegramResult<()> {
     let Some(data) = qry.data.clone() else {
-        return Ok(())
+        return Ok(());
     };
 
     let Some(msg) = qry.message.clone() else {
-        return Ok(())
+        return Ok(());
     };
 
-    bot.answer_callback_query(qry.id.clone()).await?;
     let action = CallbackAction::parse(&data);
     info!(action = ?action, "Получен callback от пользователя");
 
     match action {
         CallbackAction::Menu(menu_action) => {
-            handle_menu(bot.clone(), &qry, msg, state, menu_action).await?;
+            bot.answer_callback_query(qry.id.clone()).await?;
+            menu::handle_menu(bot.clone(), &qry, msg, state, menu_action).await?;
         }
-        CallbackAction::Ignore => {}
+        CallbackAction::Purchase(purchase_action) => {
+            purchase::handle_purchase(bot.clone(), &qry, msg, state, purchase_action).await?;
+        }
+        CallbackAction::Ignore => {
+            bot.answer_callback_query(qry.id.clone()).await?;
+        }
         CallbackAction::Unknown(unparsed) => {
+            bot.answer_callback_query(qry.id.clone()).await?;
             warn!(
                 callback = unparsed,
                 "Прилетела неизвестная или битая кнопка"

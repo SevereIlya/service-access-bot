@@ -1,7 +1,9 @@
-use crate::domain::error::{DomainError, DomainResult, UserError};
-use crate::domain::user::{TelegramId, User, UserId, UserRepository};
+use crate::domain::{
+    DomainError, DomainResult, UserError,
+    user::{SubscriptionToken, TelegramId, User, UserId, UserRepository},
+};
 use crate::exec_query;
-use crate::infrastructure::database::{SharedTransaction, SqlxExecutor, UserRow};
+use crate::infrastructure::{SharedTransaction, SqlxExecutor, UserRow};
 use async_trait::async_trait;
 use sqlx::PgPool;
 use tracing::instrument;
@@ -116,16 +118,11 @@ impl UserRepository for SqlxUserRepository {
 
         let row: Option<UserRow> = exec_query!(self.executor, query, fetch_optional)
             .map_err(|e| DomainError::SystemFailure(e.to_string()))?;
-        let user: Option<User> = row.map(TryInto::try_into).transpose()?;
-
-        Ok(user)
+        row.map(TryInto::try_into).transpose()
     }
 
     #[instrument(skip(self))]
-    async fn find_by_telegram_id(
-        &self,
-        telegram_id: TelegramId,
-    ) -> DomainResult<Option<User>> {
+    async fn find_by_telegram_id(&self, telegram_id: TelegramId) -> DomainResult<Option<User>> {
         let query = sqlx::query_as!(
             UserRow,
             r#"
@@ -138,8 +135,26 @@ impl UserRepository for SqlxUserRepository {
 
         let row: Option<UserRow> = exec_query!(self.executor, query, fetch_optional)
             .map_err(|e| DomainError::SystemFailure(e.to_string()))?;
-        let user: Option<User> = row.map(TryInto::try_into).transpose()?;
+        row.map(TryInto::try_into).transpose()
+    }
 
-        Ok(user)
+    #[instrument(skip(self))]
+    async fn find_by_subscription_token(
+        &self,
+        token: &SubscriptionToken,
+    ) -> DomainResult<Option<User>> {
+        let query = sqlx::query_as!(
+            UserRow,
+            r#"
+            SELECT *
+            FROM users
+            WHERE subscription_token = $1
+            "#,
+            token.inner()
+        );
+
+        let row: Option<UserRow> = exec_query!(self.executor, query, fetch_optional)
+            .map_err(|e| DomainError::SystemFailure(e.to_string()))?;
+        row.map(TryInto::try_into).transpose()
     }
 }

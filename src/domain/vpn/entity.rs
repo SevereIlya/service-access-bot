@@ -1,6 +1,8 @@
-use crate::domain::vpn::{NodeId, NodeIpAddress, VpnConnectionId};
+use crate::domain::{
+    user::UserId,
+    vpn::{NodeId, NodeIpAddress, VpnConnectionId},
+};
 use chrono::{DateTime, Utc};
-use crate::domain::user::UserId;
 
 /// VPN-нода, доступная для подключения пользователей.
 #[derive(Debug, Clone)]
@@ -188,10 +190,17 @@ mod tests {
         let ip = NodeIpAddress::from_str("198.51.100.5").unwrap();
         let node = Node::new("nl-1".to_string(), ip);
 
-        assert_eq!(node.id(), None, "у новой ноды не должно быть ID до сохранения в БД");
+        assert_eq!(
+            node.id(),
+            None,
+            "у новой ноды не должно быть ID до сохранения в БД"
+        );
         assert_eq!(node.name(), "nl-1");
         assert_eq!(node.ip_address(), ip);
-        assert!(node.is_active(), "новая нода по умолчанию должна быть активной");
+        assert!(
+            node.is_active(),
+            "новая нода по умолчанию должна быть активной"
+        );
     }
 
     #[test]
@@ -240,7 +249,10 @@ mod tests {
         assert_eq!(conn.id(), None);
         assert_eq!(conn.user_id(), UserId::new(1));
         assert_eq!(conn.node_id(), NodeId::new(1));
-        assert!(!conn.is_synced(), "новое соединение ещё не синхронизировано с нодой");
+        assert!(
+            !conn.is_synced(),
+            "новое соединение ещё не синхронизировано с нодой"
+        );
     }
 
     #[test]

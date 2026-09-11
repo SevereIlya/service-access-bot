@@ -18,18 +18,31 @@ pub struct MsgText {
     pub msg_subscription_expiring: String,
     pub msg_subscription_expired: String,
     pub msg_vpn_issued: String,
+    pub msg_profile: String,
+    pub msg_referral: String,
+    pub msg_help: String,
+    pub msg_about: String,
+    pub msg_tariffs_select: String,
+    pub msg_tariff_details: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct ButtonText {
     pub btn_menu_trial: String,
     pub btn_menu_main: String,
-    pub btn_menu_router: String,
+    pub btn_menu_vpn: String,
     pub btn_menu_profile: String,
     pub btn_menu_tariffs: String,
     pub btn_menu_referral: String,
+    pub btn_menu_about: String,
     pub btn_menu_help: String,
     pub btn_menu_down: String,
+    pub btn_tariff_week_1: String,
+    pub btn_tariff_month_1: String,
+    pub btn_tariff_month_3: String,
+    pub btn_tariff_month_6: String,
+    pub btn_pay: String,
+    pub btn_back: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]

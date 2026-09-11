@@ -1,4 +1,4 @@
-use crate::application::usecases::UseCases;
+use crate::application::UseCases;
 use std::sync::Arc;
 use tokio::time::{Duration, interval};
 use tracing::{error, info, instrument};

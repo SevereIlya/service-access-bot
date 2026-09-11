@@ -1,35 +1,9 @@
-use crate::domain::error::{DomainError, DomainResult, SubscriptionError};
+use crate::domain::{DomainError, DomainResult, SubscriptionError};
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SubscriptionId(i64);
-
-/// Тарифный план подписки.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SubscriptionPlan {
-    Trial,
-    Month1,
-    Month3,
-    Month6,
-    Month12,
-}
-
-/// Текущий статус подписки.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum SubscriptionStatus {
-    Active,
-    Inactive,
-    Expired,
-    Canceled,
-}
-
-/// Количество устройств, доступных в рамках подписки.
-///
-/// Допустимое количество устройств — от 1 до 10 включительно.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct SubscriptionDevices(i32);
-
-// =============================================================================================
 
 impl SubscriptionId {
     /// Создаёт идентификатор подписки из значения.
@@ -50,16 +24,26 @@ impl Display for SubscriptionId {
     }
 }
 
+/// Тарифный план подписки.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SubscriptionPlan {
+    Trial,
+    Week1,
+    Month1,
+    Month3,
+    Month6,
+}
+
 impl SubscriptionPlan {
     /// Возвращает строковое представление тарифного плана.
     #[must_use]
     pub const fn as_str(&self) -> &'static str {
         match self {
             Self::Trial => "trial",
+            Self::Week1 => "week_1",
             Self::Month1 => "month_1",
             Self::Month3 => "month_3",
             Self::Month6 => "month_6",
-            Self::Month12 => "month_12",
         }
     }
 }
@@ -74,13 +58,22 @@ impl FromStr for SubscriptionPlan {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "trial" => Ok(Self::Trial),
+            "week_1" => Ok(Self::Week1),
             "month_1" => Ok(Self::Month1),
             "month_3" => Ok(Self::Month3),
             "month_6" => Ok(Self::Month6),
-            "month_12" => Ok(Self::Month12),
             _ => Err(SubscriptionError::InvalidPlan(s.to_string()).into()),
         }
     }
+}
+
+/// Текущий статус подписки.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum SubscriptionStatus {
+    Active,
+    Inactive,
+    Expired,
+    Canceled,
 }
 
 impl SubscriptionStatus {
@@ -114,6 +107,12 @@ impl FromStr for SubscriptionStatus {
     }
 }
 
+/// Количество устройств, доступных в рамках подписки.
+///
+/// Допустимое количество устройств — от 1 до 10 включительно.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct SubscriptionDevices(i32);
+
 impl SubscriptionDevices {
     /// Создаёт количество устройств.
     ///
@@ -137,10 +136,6 @@ impl Display for SubscriptionDevices {
     }
 }
 
-// ==============================================================================================
-//                                          ТЕСТЫ
-// ==============================================================================================
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -160,10 +155,10 @@ mod tests {
     #[test]
     fn test_subscription_plan_as_str() {
         assert_eq!(SubscriptionPlan::Trial.as_str(), "trial");
+        assert_eq!(SubscriptionPlan::Week1.as_str(), "week_1");
         assert_eq!(SubscriptionPlan::Month1.as_str(), "month_1");
         assert_eq!(SubscriptionPlan::Month3.as_str(), "month_3");
         assert_eq!(SubscriptionPlan::Month6.as_str(), "month_6");
-        assert_eq!(SubscriptionPlan::Month12.as_str(), "month_12");
     }
 
     #[test]
@@ -171,6 +166,10 @@ mod tests {
         assert_eq!(
             SubscriptionPlan::from_str("trial").unwrap(),
             SubscriptionPlan::Trial
+        );
+        assert_eq!(
+            SubscriptionPlan::from_str("week_1").unwrap(),
+            SubscriptionPlan::Week1
         );
         assert_eq!(
             SubscriptionPlan::from_str("month_1").unwrap(),
@@ -184,10 +183,6 @@ mod tests {
             SubscriptionPlan::from_str("month_6").unwrap(),
             SubscriptionPlan::Month6
         );
-        assert_eq!(
-            SubscriptionPlan::from_str("month_12").unwrap(),
-            SubscriptionPlan::Month12
-        );
     }
 
     #[test]
@@ -196,7 +191,10 @@ mod tests {
         assert!(result.is_err());
 
         match result.unwrap_err() {
-            DomainError::Subscription(SubscriptionError::InvalidPlan(plan)) => { assert_eq!(plan, "forever") } _ => panic!("Ожидалась ошибка SubscriptionError::InvalidPlan"),
+            DomainError::Subscription(SubscriptionError::InvalidPlan(plan)) => {
+                assert_eq!(plan, "forever")
+            }
+            _ => panic!("Ожидалась ошибка SubscriptionError::InvalidPlan"),
         }
     }
 
@@ -235,7 +233,10 @@ mod tests {
         assert!(result.is_err());
 
         match result.unwrap_err() {
-            DomainError::Subscription(SubscriptionError::InvalidStatus(status)) => { assert_eq!(status, "banned") } _ => panic!("Ожидалась ошибка SubscriptionError::InvalidStatus"),
+            DomainError::Subscription(SubscriptionError::InvalidStatus(status)) => {
+                assert_eq!(status, "banned")
+            }
+            _ => panic!("Ожидалась ошибка SubscriptionError::InvalidStatus"),
         }
     }
 
@@ -258,13 +259,19 @@ mod tests {
         let result_under = SubscriptionDevices::new(0);
         assert!(result_under.is_err());
         match result_under.unwrap_err() {
-            DomainError::Subscription(SubscriptionError::InvalidDevices(val)) => { assert_eq!(val, 0) } _ => panic!("Ожидалась ошибка SubscriptionError::InvalidDevices"),
+            DomainError::Subscription(SubscriptionError::InvalidDevices(val)) => {
+                assert_eq!(val, 0)
+            }
+            _ => panic!("Ожидалась ошибка SubscriptionError::InvalidDevices"),
         }
 
         let result_over = SubscriptionDevices::new(11);
         assert!(result_over.is_err());
         match result_over.unwrap_err() {
-            DomainError::Subscription(SubscriptionError::InvalidDevices(val)) => { assert_eq!(val, 11) } _ => panic!("Ожидалась ошибка SubscriptionError::InvalidDevices"),
+            DomainError::Subscription(SubscriptionError::InvalidDevices(val)) => {
+                assert_eq!(val, 11)
+            }
+            _ => panic!("Ожидалась ошибка SubscriptionError::InvalidDevices"),
         }
     }
 }

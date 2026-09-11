@@ -1,8 +1,10 @@
-use crate::domain::error::{DomainError, DomainResult, SubscriptionError};
-use crate::domain::subscription::{Subscription, SubscriptionRepository};
-use crate::domain::user::UserId;
+use crate::domain::{
+    DomainError, DomainResult, SubscriptionError,
+    subscription::{Subscription, SubscriptionRepository},
+    user::UserId,
+};
 use crate::exec_query;
-use crate::infrastructure::database::{SharedTransaction, SqlxExecutor, SubscriptionRow};
+use crate::infrastructure::{SharedTransaction, SqlxExecutor, SubscriptionRow};
 use async_trait::async_trait;
 use sqlx::PgPool;
 use tracing::instrument;
@@ -68,9 +70,7 @@ impl SubscriptionRepository for SqlxSubscriptionRepository {
 
     #[instrument(skip(self, sub), fields(user_id = %sub.user_id()))]
     async fn update(&self, sub: &Subscription) -> DomainResult<()> {
-        let id = sub
-            .id()
-            .ok_or(DomainError::Subscription(SubscriptionError::EntityNotSaved))?;
+        let id = sub.id().ok_or(DomainError::Subscription(SubscriptionError::EntityNotSaved))?;
 
         let query = sqlx::query!(
             r#"
@@ -96,10 +96,7 @@ impl SubscriptionRepository for SqlxSubscriptionRepository {
     }
 
     #[instrument(skip(self))]
-    async fn find_active_by_user_id(
-        &self,
-        user_id: UserId,
-    ) -> DomainResult<Option<Subscription>> {
+    async fn find_active_by_user_id(&self, user_id: UserId) -> DomainResult<Option<Subscription>> {
         let query = sqlx::query_as!(
             SubscriptionRow,
             r#"
@@ -113,12 +110,9 @@ impl SubscriptionRepository for SqlxSubscriptionRepository {
             user_id.inner()
         );
 
-        let row: Option<SubscriptionRow> =
-            exec_query!(self.executor, query, fetch_optional)
-                .map_err(|e| DomainError::SystemFailure(e.to_string()))?;
-        let sub: Option<Subscription> = row.map(TryInto::try_into).transpose()?;
-
-        Ok(sub)
+        let row: Option<SubscriptionRow> = exec_query!(self.executor, query, fetch_optional)
+            .map_err(|e| DomainError::SystemFailure(e.to_string()))?;
+        row.map(TryInto::try_into).transpose()
     }
 
     #[instrument(skip(self))]

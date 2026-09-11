@@ -1,4 +1,4 @@
-use crate::domain::error::NodeError;
+use crate::domain::NodeError;
 use std::fmt::{Display, Formatter};
 use std::net::IpAddr;
 use std::str::FromStr;
@@ -45,9 +45,7 @@ impl FromStr for NodeIpAddress {
     type Err = NodeError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let ip = s
-            .parse::<IpAddr>()
-            .map_err(|_| NodeError::InvalidIpAddress(s.to_string()))?;
+        let ip = s.parse::<IpAddr>().map_err(|_| NodeError::InvalidIpAddress(s.to_string()))?;
         Ok(Self(ip))
     }
 }

@@ -1,7 +1,7 @@
-use crate::domain::subscription::{
-    SubscriptionDevices, SubscriptionId, SubscriptionPlan, SubscriptionStatus,
+use crate::domain::{
+    subscription::{SubscriptionDevices, SubscriptionId, SubscriptionPlan, SubscriptionStatus},
+    user::UserId,
 };
-use crate::domain::user::UserId;
 use chrono::{DateTime, Utc};
 
 #[derive(Debug, Clone)]
@@ -168,10 +168,6 @@ impl Subscription {
     }
 }
 
-// ==============================================================================================
-//                                          ТЕСТЫ
-// ==============================================================================================
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -229,11 +225,8 @@ mod tests {
 
     #[test]
     fn test_is_expired_returns_false_for_active_subscription() {
-        let sub = create_test_subscription(
-            SubscriptionPlan::Month3,
-            SubscriptionStatus::Active,
-            30,
-        );
+        let sub =
+            create_test_subscription(SubscriptionPlan::Month3, SubscriptionStatus::Active, 30);
         assert!(!sub.is_expired(), "Подписка не должна быть истекшей");
     }
 
@@ -253,11 +246,8 @@ mod tests {
 
     #[test]
     fn test_expire_transitions_status_to_expired() {
-        let mut sub = create_test_subscription(
-            SubscriptionPlan::Month3,
-            SubscriptionStatus::Active,
-            30,
-        );
+        let mut sub =
+            create_test_subscription(SubscriptionPlan::Month3, SubscriptionStatus::Active, 30);
         sub.expire();
         assert_eq!(
             sub.status,
@@ -268,21 +258,15 @@ mod tests {
 
     #[test]
     fn test_is_active_returns_true_for_active_non_expired() {
-        let sub = create_test_subscription(
-            SubscriptionPlan::Month3,
-            SubscriptionStatus::Active,
-            30,
-        );
+        let sub =
+            create_test_subscription(SubscriptionPlan::Month3, SubscriptionStatus::Active, 30);
         assert!(sub.is_active(), "Подписка должна быть активной");
     }
 
     #[test]
     fn test_is_active_returns_false_for_inactive_status() {
-        let sub = create_test_subscription(
-            SubscriptionPlan::Month3,
-            SubscriptionStatus::Inactive,
-            30,
-        );
+        let sub =
+            create_test_subscription(SubscriptionPlan::Month3, SubscriptionStatus::Inactive, 30);
         assert!(
             !sub.is_active(),
             "Неактивная подписка не должна быть активной"
@@ -308,11 +292,8 @@ mod tests {
 
     #[test]
     fn test_can_extend_returns_true_for_active_status() {
-        let sub = create_test_subscription(
-            SubscriptionPlan::Month3,
-            SubscriptionStatus::Active,
-            30,
-        );
+        let sub =
+            create_test_subscription(SubscriptionPlan::Month3, SubscriptionStatus::Active, 30);
         assert!(
             sub.can_extend(),
             "Активная подписка должна быть продлеваемой"
@@ -321,11 +302,8 @@ mod tests {
 
     #[test]
     fn test_can_extend_returns_false_for_inactive_status() {
-        let sub = create_test_subscription(
-            SubscriptionPlan::Month3,
-            SubscriptionStatus::Inactive,
-            30,
-        );
+        let sub =
+            create_test_subscription(SubscriptionPlan::Month3, SubscriptionStatus::Inactive, 30);
         assert!(
             !sub.can_extend(),
             "Неактивная подписка не должна быть продлеваемой"
@@ -334,11 +312,8 @@ mod tests {
 
     #[test]
     fn test_can_extend_returns_false_for_canceled_status() {
-        let sub = create_test_subscription(
-            SubscriptionPlan::Month3,
-            SubscriptionStatus::Canceled,
-            30,
-        );
+        let sub =
+            create_test_subscription(SubscriptionPlan::Month3, SubscriptionStatus::Canceled, 30);
         assert!(
             !sub.can_extend(),
             "Отменённая подписка не должна быть продлеваемой"
@@ -347,11 +322,7 @@ mod tests {
 
     #[test]
     fn test_days_until_expiry_returns_correct_value() {
-        let sub = create_test_subscription(
-            SubscriptionPlan::Month3,
-            SubscriptionStatus::Active,
-            5,
-        );
+        let sub = create_test_subscription(SubscriptionPlan::Month3, SubscriptionStatus::Active, 5);
         let days = sub.days_until_expiry();
         assert!(
             days >= 4 && days <= 5,
@@ -414,11 +385,8 @@ mod tests {
 
     #[test]
     fn test_assign_id_sets_expected_value() {
-        let mut sub = create_test_subscription(
-            SubscriptionPlan::Month3,
-            SubscriptionStatus::Active,
-            30,
-        );
+        let mut sub =
+            create_test_subscription(SubscriptionPlan::Month3, SubscriptionStatus::Active, 30);
 
         assert_eq!(
             sub.id(),
@@ -438,11 +406,8 @@ mod tests {
 
     #[test]
     fn test_mark_warning_sent_marks_warning_as_sent() {
-        let mut subscription = create_test_subscription(
-            SubscriptionPlan::Month3,
-            SubscriptionStatus::Active,
-            30,
-        );
+        let mut subscription =
+            create_test_subscription(SubscriptionPlan::Month3, SubscriptionStatus::Active, 30);
 
         assert!(
             !subscription.is_warning_sent(),

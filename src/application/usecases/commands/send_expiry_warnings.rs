@@ -1,7 +1,7 @@
-use crate::application::error::AppResult;
-use crate::domain::notification::DynNotifier;
-use crate::domain::subscription::DynSubscriptionRepository;
-use crate::domain::user::DynUserRepository;
+use crate::application::AppResult;
+use crate::domain::{
+    notification::DynNotifier, subscription::DynSubscriptionRepository, user::DynUserRepository,
+};
 use tracing::{error, info, warn};
 
 #[derive(Debug, Default)]
@@ -75,21 +75,18 @@ impl SendExpiryWarningsCommand {
     }
 }
 
-// ==============================================================================================
-//                                          ТЕСТЫ
-// ==============================================================================================
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::error::{DomainError, DomainResult};
-    use crate::domain::notification::Notifier;
-    use crate::domain::subscription::{
-        Subscription, SubscriptionDevices, SubscriptionPlan, SubscriptionRepository,
-        SubscriptionStatus,
-    };
-    use crate::domain::user::{
-        Money, ReferralCode, SubscriptionToken, TelegramId, User, UserId, UserRepository,
+    use crate::domain::{
+        DomainError, DomainResult,
+        billing::Money,
+        notification::Notifier,
+        subscription::{
+            Subscription, SubscriptionDevices, SubscriptionPlan, SubscriptionRepository,
+            SubscriptionStatus,
+        },
+        user::{ReferralCode, SubscriptionToken, TelegramId, User, UserId, UserRepository},
     };
     use async_trait::async_trait;
     use chrono::{DateTime, Days, Utc};
@@ -120,6 +117,12 @@ mod tests {
             _telegram_id: TelegramId,
         ) -> DomainResult<Option<User>> {
             unreachable!("find_by_telegram_id() не используется в этом юзкейсе")
+        }
+        async fn find_by_subscription_token(
+            &self,
+            _token: &SubscriptionToken,
+        ) -> DomainResult<Option<User>> {
+            unreachable!("find_by_subscription_token() не используется в этом юзкейсе")
         }
     }
 
@@ -196,10 +199,7 @@ mod tests {
         user
     }
 
-    fn make_expiring_subscription(
-        user_id: i64,
-        expires_at: DateTime<Utc>,
-    ) -> Subscription {
+    fn make_expiring_subscription(user_id: i64, expires_at: DateTime<Utc>) -> Subscription {
         Subscription::new(
             UserId::new(user_id),
             SubscriptionPlan::Month1,
@@ -336,8 +336,7 @@ mod tests {
         let sub1 = make_expiring_subscription(1, Utc::now() + Days::new(1));
         let sub2 = make_expiring_subscription(2, Utc::now() + Days::new(1));
 
-        let (cmd, updated, calls) =
-            setup(vec![user1, user2], vec![sub1, sub2], false, false);
+        let (cmd, updated, calls) = setup(vec![user1, user2], vec![sub1, sub2], false, false);
 
         let summary = cmd.execute().await.unwrap();
 

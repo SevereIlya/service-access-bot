@@ -1,4 +1,4 @@
-use crate::domain::error::DomainError;
+use crate::domain::DomainError;
 use thiserror::Error;
 
 pub type AppResult<T> = Result<T, AppError>;

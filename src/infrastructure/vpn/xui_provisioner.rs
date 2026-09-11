@@ -1,9 +1,10 @@
-use crate::domain::error::{DomainError, DomainResult};
-use crate::domain::subscription::SubscriptionDevices;
-use crate::domain::user::User;
-use crate::domain::vpn::{Node, VpnProvisioner};
-use crate::infrastructure::config::{AppConfig, VpnNodeConfig};
-use crate::infrastructure::vpn::{ClientObj, XuiClient};
+use crate::domain::{
+    DomainError, DomainResult,
+    subscription::SubscriptionDevices,
+    user::User,
+    vpn::{Node, VpnProvisioner},
+};
+use crate::infrastructure::{AppConfig, ClientObj, VpnNodeConfig, XuiClient};
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::Arc;

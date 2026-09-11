@@ -1,37 +1,33 @@
-use crate::application::error::AppResult;
+use crate::application::AppResult;
 use crate::domain::user::{DynUserRepository, TelegramId, User};
 
-pub struct GetUserQuery {
+pub struct GetUserByTelegramIdQuery {
     user_repo: DynUserRepository,
 }
 
-impl GetUserQuery {
+impl GetUserByTelegramIdQuery {
     pub fn new(user_repo: DynUserRepository) -> Self {
         Self { user_repo }
     }
 
     pub async fn execute(&self, telegram_id: i64) -> AppResult<Option<User>> {
-        let user =
-            self.user_repo.find_by_telegram_id(TelegramId::new(telegram_id)).await?;
+        let id = TelegramId::new(telegram_id);
+        let user = self.user_repo.find_by_telegram_id(id).await?;
         Ok(user)
     }
 }
 
-// ==============================================================================================
-//                                          ТЕСТЫ
-// ==============================================================================================
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::{
+        DomainResult,
+        billing::Money,
+        user::{ReferralCode, SubscriptionToken, TelegramId, UserId, UserRepository},
+    };
     use async_trait::async_trait;
     use std::sync::Arc;
     use uuid::Uuid;
-
-    use crate::domain::error::DomainResult;
-    use crate::domain::user::{
-        Money, ReferralCode, SubscriptionToken, TelegramId, UserId, UserRepository,
-    };
 
     // ==========================================
     // Моки
@@ -46,20 +42,20 @@ mod tests {
         async fn create(&self, _user: &User) -> DomainResult<UserId> {
             unreachable!("create() не используется в этом юзкейсе")
         }
-
         async fn update(&self, _user: &User) -> DomainResult<()> {
             unreachable!("update() не используется в этом юзкейсе")
         }
-
         async fn find_by_user_id(&self, _id: UserId) -> DomainResult<Option<User>> {
             unreachable!("find_by_user_id() не используется в этом юзкейсе")
         }
-
         async fn find_by_telegram_id(
             &self,
             _telegram_id: TelegramId,
         ) -> DomainResult<Option<User>> {
             Ok(self.user_to_return.clone())
+        }
+        async fn find_by_subscription_token(&self, _token: &SubscriptionToken) -> DomainResult<Option<User>> {
+            unreachable!("find_by_subscription_token() не используется в этом юзкейсе")
         }
     }
 
@@ -94,7 +90,7 @@ mod tests {
             user_to_return: Some(existing_user),
         });
 
-        let query = GetUserQuery::new(repo);
+        let query = GetUserByTelegramIdQuery::new(repo);
         let result = query.execute(target_tg_id).await.unwrap();
 
         assert!(result.is_some());
@@ -107,7 +103,7 @@ mod tests {
             user_to_return: None,
         });
 
-        let query = GetUserQuery::new(repo);
+        let query = GetUserByTelegramIdQuery::new(repo);
         let result = query.execute(12345).await.unwrap();
 
         assert!(result.is_none());

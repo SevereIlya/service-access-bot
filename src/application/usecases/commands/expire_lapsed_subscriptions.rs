@@ -1,9 +1,10 @@
-use crate::application::error::AppResult;
-use crate::domain::notification::DynNotifier;
-use crate::domain::subscription::DynSubscriptionRepository;
-use crate::domain::subscription::Subscription;
-use crate::domain::user::DynUserRepository;
-use crate::domain::vpn::DynVpnAccessRevoker;
+use crate::application::AppResult;
+use crate::domain::{
+    notification::DynNotifier,
+    subscription::{DynSubscriptionRepository, Subscription},
+    user::DynUserRepository,
+    vpn::DynVpnAccessRevoker,
+};
 use tracing::{error, info, warn};
 
 #[derive(Debug, Default)]
@@ -35,8 +36,7 @@ impl ExpireLapsedSubscriptionsCommand {
     }
 
     pub async fn execute(&self) -> AppResult<ExpirySummary> {
-        let lapsed: Vec<Subscription> =
-            self.subscription_repo.find_lapsed_active().await?;
+        let lapsed: Vec<Subscription> = self.subscription_repo.find_lapsed_active().await?;
         let mut summary = ExpirySummary::default();
 
         for mut sub in lapsed {
@@ -81,23 +81,20 @@ impl ExpireLapsedSubscriptionsCommand {
     }
 }
 
-// ==============================================================================================
-//                                          ТЕСТЫ
-// ==============================================================================================
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::error::{DomainError, DomainResult};
-    use crate::domain::notification::Notifier;
-    use crate::domain::subscription::{
-        Subscription, SubscriptionDevices, SubscriptionPlan, SubscriptionRepository,
-        SubscriptionStatus,
+    use crate::domain::{
+        DomainError, DomainResult,
+        billing::Money,
+        notification::Notifier,
+        subscription::{
+            SubscriptionDevices, SubscriptionPlan, SubscriptionRepository,
+            SubscriptionStatus,
+        },
+        user::{ReferralCode, SubscriptionToken, TelegramId, User, UserId, UserRepository},
+        vpn::VpnAccessRevoker,
     };
-    use crate::domain::user::{
-        Money, ReferralCode, SubscriptionToken, TelegramId, User, UserId, UserRepository,
-    };
-    use crate::domain::vpn::VpnAccessRevoker;
     use async_trait::async_trait;
     use chrono::{DateTime, Days, Utc};
     use std::sync::{Arc, Mutex};
@@ -127,6 +124,9 @@ mod tests {
             _telegram_id: TelegramId,
         ) -> DomainResult<Option<User>> {
             unreachable!("find_by_telegram_id() не используется в этом юзкейсе")
+        }
+        async fn find_by_subscription_token(&self, _token: &SubscriptionToken) -> DomainResult<Option<User>> {
+            unreachable!("find_by_subscription_token() не используется в этом юзкейсе")
         }
     }
 
@@ -262,8 +262,7 @@ mod tests {
             fail: fail_notify,
             expired_calls: notify_calls.clone(),
         });
-        let cmd =
-            ExpireLapsedSubscriptionsCommand::new(sub_repo, user_repo, vpn, notifier);
+        let cmd = ExpireLapsedSubscriptionsCommand::new(sub_repo, user_repo, vpn, notifier);
         (cmd, updated, vpn_calls, notify_calls)
     }
 
@@ -273,8 +272,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_no_lapsed_subscriptions_does_nothing() {
-        let (cmd, updated, vpn_calls, notify_calls) =
-            setup(vec![], vec![], vec![], false, false);
+        let (cmd, updated, vpn_calls, notify_calls) = setup(vec![], vec![], vec![], false, false);
         let summary = cmd.execute().await.unwrap();
         assert_eq!(summary.expired, 0);
         assert_eq!(summary.failed, 0);

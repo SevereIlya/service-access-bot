@@ -1,7 +1,5 @@
-use crate::adapters::telegram::ui::UiText;
-use crate::domain::error::{DomainError, DomainResult};
-use crate::domain::notification::Notifier;
-use crate::domain::user::User;
+use crate::adapters::telegram::UiText;
+use crate::domain::{DomainError, DomainResult, notification::Notifier, user::User};
 use async_trait::async_trait;
 use chrono::{DateTime, FixedOffset, Utc};
 use std::sync::Arc;
@@ -31,8 +29,7 @@ impl Notifier for TelegramNotifier {
     ) -> DomainResult<()> {
         let msk_offset = FixedOffset::east_opt(3 * 3600)
             .expect("Hardcoded offset of +3 hours is mathematically always valid");
-        let date_str =
-            expires_at.with_timezone(&msk_offset).format("%d.%m.%Y %H:%M").to_string();
+        let date_str = expires_at.with_timezone(&msk_offset).format("%d.%m.%Y %H:%M").to_string();
         let text = self.ui.message.msg_subscription_expiring.replace("{date}", &date_str);
         let chat_id = ChatId(user.telegram_id().inner());
 
