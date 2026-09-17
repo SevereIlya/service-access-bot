@@ -108,6 +108,21 @@ impl TransactionRepository for SqlxTransactionRepository {
 
     #[instrument(skip(self))]
     async fn balance_for_user(&self, user_id: UserId) -> DomainResult<Money> {
+        // Блокируем строку юзера до конца транзакции, чтобы избежать параллельного списания
+        let lock = sqlx::query!(
+            r#"
+            SELECT id
+            FROM users
+            WHERE id = $1
+            FOR UPDATE
+            "#,
+            user_id.inner()
+        );
+        let _ = exec_query!(self.executor, lock, fetch_one).map_err(|e| {
+            DomainError::SystemFailure(format!("Не удалось заблокировать юзера {user_id}: {e}"))
+        })?;
+
+        // Читаем баланс уже после блокировки, чтобы отловить все изменения
         let balance = sqlx::query_scalar!(
             r#"
             SELECT COALESCE(SUM(

@@ -31,6 +31,16 @@ btn_tariff_month_6 = "6 months"
 btn_pay = "Pay"
 btn_back = "Back"
 
+[alert]
+alert_title = "<b>Error</b>"
+alert_suppressed = "Recurring problem: {suppressed} more silently suppressed in the last {minutes} min"
+alert_what = "<b>What:</b> {message}"
+alert_where = "<b>Where:</b> {where}"
+alert_module = "<b>Module:</b> {module}"
+alert_context_header = "<b>Context:</b>"
+alert_context_line = "• <code>{name}</code>: {value}"
+alert_when = "<b>When:</b> {date} MSK"
+
 [error]
 err_user_not_found = "User not found"
 err_trial_used = "Trial used"

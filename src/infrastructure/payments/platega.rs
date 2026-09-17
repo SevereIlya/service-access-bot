@@ -83,29 +83,6 @@ impl From<PlategaStatus> for ProviderTxStatus {
     }
 }
 
-#[allow(clippy::cast_precision_loss)]
-fn money_to_rubles(amount: Money) -> f64 {
-    amount.inner() as f64 / 100.0
-}
-
-#[allow(clippy::cast_possible_truncation)]
-fn rubles_to_money(rubles: f64) -> DomainResult<Money> {
-    const MAX_SAFE_INTEGER: f64 = 9_007_199_254_740_991.0; // 2^53 - 1
-    if !rubles.is_finite() {
-        return Err(DomainError::SystemFailure(
-            "Platega вернула некорректную сумму (NaN/Infinity)".into(),
-        ));
-    }
-    let kopecks = (rubles * 100.0).round();
-
-    if !(-MAX_SAFE_INTEGER..=MAX_SAFE_INTEGER).contains(&kopecks) {
-        return Err(DomainError::SystemFailure(
-            "Сумма от Platega выходит за пределы безопасной точности".into(),
-        ));
-    }
-    Money::new(kopecks as i64)
-}
-
 #[async_trait]
 impl PaymentGateway for PlategaGateway {
     async fn create_invoice(
@@ -116,7 +93,7 @@ impl PaymentGateway for PlategaGateway {
     ) -> DomainResult<PaymentInvoice> {
         let body = CreateInvoiceRequest {
             payment_details: PaymentDetailsDto {
-                amount: money_to_rubles(amount),
+                amount: amount.as_rubles_f64(),
                 currency: "RUB".to_string(),
             },
             description: "Пополнение баланса Paralink VPN".to_string(),
@@ -125,9 +102,7 @@ impl PaymentGateway for PlategaGateway {
             order_id: order_id.to_string(),
             metadata: MetadataDto {
                 user_id: payer.telegram_id().inner().to_string(),
-                user_name: payer
-                    .username()
-                    .unwrap_or_else(|| payer.full_name().to_string()),
+                user_name: payer.username().unwrap_or_else(|| payer.full_name().to_string()),
             },
         };
 
@@ -190,7 +165,7 @@ impl PaymentGateway for PlategaGateway {
 
         Ok(ProviderTransactionState {
             status: parsed.status.into(),
-            amount: rubles_to_money(parsed.payment_details.amount)?,
+            amount: Money::try_from_rubles_f64(parsed.payment_details.amount)?,
             raw,
         })
     }

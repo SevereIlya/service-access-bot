@@ -22,6 +22,9 @@ pub enum DomainError {
 
 #[derive(Error, Debug)]
 pub enum BillingError {
+    #[error("Amount out of range: {0}")]
+    AmountOutOfRange(f64),
+
     #[error("Entity has no ID. It must be saved to the database first.")]
     EntityNotSaved,
 
@@ -39,6 +42,12 @@ pub enum BillingError {
 
     #[error("Invalid transaction kind: {0}")]
     InvalidTransactionKind(String),
+
+    #[error("Non finite amount")]
+    NonFiniteAmount,
+
+    #[error("Subscription plan is not purchasable: {0}")]
+    PlanNotPurchasable(String),
 }
 
 #[derive(Error, Debug)]

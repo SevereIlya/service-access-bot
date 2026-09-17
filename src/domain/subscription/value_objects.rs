@@ -46,6 +46,23 @@ impl SubscriptionPlan {
             Self::Month6 => "month_6",
         }
     }
+
+    /// Длительность плана в календарных днях.
+    #[must_use]
+    pub const fn duration_days(&self) -> u64 {
+        match self {
+            Self::Trial => 5,
+            Self::Week1 => 7,
+            Self::Month1 => 30,
+            Self::Month3 => 90,
+            Self::Month6 => 180,
+        }
+    }
+
+    #[must_use]
+    pub const fn is_purchasable(&self) -> bool {
+        !matches!(self, Self::Trial)
+    }
 }
 
 impl FromStr for SubscriptionPlan {

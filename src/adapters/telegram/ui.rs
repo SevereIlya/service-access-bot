@@ -6,6 +6,7 @@ use std::fs::read_to_string;
 pub struct UiText {
     pub message: MsgText,
     pub button: ButtonText,
+    pub alert: AlertText,
     pub error: ErrorText,
 }
 #[derive(Debug, Clone, Deserialize)]
@@ -43,6 +44,18 @@ pub struct ButtonText {
     pub btn_tariff_month_6: String,
     pub btn_pay: String,
     pub btn_back: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct AlertText {
+    pub alert_title: String,
+    pub alert_suppressed: String,
+    pub alert_what: String,
+    pub alert_where: String,
+    pub alert_module: String,
+    pub alert_context_header: String,
+    pub alert_context_line: String,
+    pub alert_when: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]

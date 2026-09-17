@@ -1,8 +1,9 @@
 use crate::domain::{
+    DomainError, DomainResult, SubscriptionError,
     subscription::{SubscriptionDevices, SubscriptionId, SubscriptionPlan, SubscriptionStatus},
     user::UserId,
 };
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Days, Utc};
 
 #[derive(Debug, Clone)]
 pub struct Subscription {
@@ -149,6 +150,31 @@ impl Subscription {
     /// Отмечает, что предупреждение о скором истечении подписки было отправлено
     pub const fn mark_warning_sent(&mut self) {
         self.is_warning_sent = true;
+    }
+
+    /// Применяет купленный тариф к уже активной подписке.
+    ///
+    /// Срок действия УВЕЛИЧИВАЕТСЯ на длительность купленного тарифа - остаток уже оплаченного времени не сгорает при допокупке.
+    /// Лимит устройств заменяется на купленный, а `plan` становится последним купленным тарифом (используется только для отображения в UI).
+    ///
+    /// Сбрасывает `is_warning_sent`: с новым сроком начинается новый жизненный цикл подписки,
+    /// и старое предупреждение не должно блокировать отправку нового перед НОВОЙ датой истечения.
+    ///
+    /// # Errors
+    /// [`SubscriptionError::NoActiveSubscription`], если подписка не активна на момент продления.
+    pub fn renew(
+        &mut self,
+        plan: SubscriptionPlan,
+        devices: SubscriptionDevices,
+    ) -> DomainResult<()> {
+        if !self.is_active() {
+            return Err(DomainError::Subscription(SubscriptionError::NoActiveSubscription));
+        }
+        self.expires_at = self.expires_at + Days::new(plan.duration_days());
+        self.plan = plan;
+        self.devices = devices;
+        self.is_warning_sent = false;
+        Ok(())
     }
 
     /// Проверяет, является ли подписка активной.
@@ -419,6 +445,79 @@ mod tests {
         assert!(
             subscription.is_warning_sent(),
             "Предупреждение должно считаться отправленным"
+        );
+    }
+
+    #[test]
+    fn test_renew_extends_expiry_and_updates_devices_and_plan() {
+        let now = Utc::now();
+        let mut sub = Subscription::restore_from_db(
+            SubscriptionId::new(1),
+            UserId::new(42),
+            SubscriptionPlan::Week1,
+            now - Days::new(2),
+            now + Days::new(3),
+            SubscriptionStatus::Active,
+            SubscriptionDevices::new(1).unwrap(),
+            true,
+            now - Days::new(2),
+        );
+        let old_expiry = sub.expires_at();
+
+        let result = sub.renew(SubscriptionPlan::Month3, SubscriptionDevices::new(5).unwrap());
+
+        assert!(result.is_ok());
+        assert_eq!(
+            sub.expires_at(),
+            old_expiry + Days::new(SubscriptionPlan::Month3.duration_days()),
+            "срок должен УВЕЛИЧИТЬСЯ на длительность нового тарифа, а не замениться на него"
+        );
+        assert_eq!(sub.plan(), SubscriptionPlan::Month3);
+        assert_eq!(sub.devices(), SubscriptionDevices::new(5).unwrap());
+        assert!(
+            !sub.is_warning_sent(),
+            "флаг предупреждения должен сброситься - у подписки новый жизненный цикл"
+        );
+    }
+
+    #[test]
+    fn test_renew_fails_if_subscription_not_active() {
+        let now = Utc::now();
+        let mut sub = Subscription::new(
+            UserId::new(42),
+            SubscriptionPlan::Month1,
+            now,
+            now + Days::new(30),
+            SubscriptionStatus::Inactive,
+            SubscriptionDevices::new(2).unwrap(),
+        );
+
+        let result = sub.renew(SubscriptionPlan::Month1, SubscriptionDevices::new(2).unwrap());
+
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            DomainError::Subscription(SubscriptionError::NoActiveSubscription)
+        ));
+    }
+
+    #[test]
+    fn test_renew_fails_if_subscription_already_expired() {
+        let now = Utc::now();
+        let mut sub = Subscription::new(
+            UserId::new(42),
+            SubscriptionPlan::Month1,
+            now - Days::new(40),
+            now - Days::new(10),
+            SubscriptionStatus::Active,
+            SubscriptionDevices::new(2).unwrap(),
+        );
+
+        let result = sub.renew(SubscriptionPlan::Month1, SubscriptionDevices::new(2).unwrap());
+
+        assert!(
+            result.is_err(),
+            "renew() не должен доверять только статусу Active - нужно ещё и проверить срок"
         );
     }
 }

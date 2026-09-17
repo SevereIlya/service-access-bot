@@ -30,5 +30,10 @@ pub trait TransactionRepository: Send + Sync {
     async fn find_by_provider_tx_id(&self, provider_tx_id: &str) -> DomainResult<Option<Transaction>>;
 
     /// Возвращает текущий баланс пользователя.
+    ///
+    /// Внутри uow транзакции первой же инструкцией блокирует строку пользователя.
+    /// Параллельные вызовы для того же юзера выстраиваются в очередь.
+    ///
+    /// Вне транзакции (pool) блокировка живёт только на время метода.
     async fn balance_for_user(&self, user_id: UserId) -> DomainResult<Money>;
 }

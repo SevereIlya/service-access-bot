@@ -28,12 +28,13 @@ impl RequestTopUpCommand {
 
     pub async fn execute(&self, user: &User, amount: Money) -> AppResult<String> {
         let user_id = user.id().ok_or(DomainError::User(UserError::EntityNotSaved))?;
-        let order_id = format!("topup_{user_id}_{}", Uuid::new_v4().simple());
+        let kind = TransactionKind::TopUp;
+        let order_id = format!("{}_{user_id}_{}", kind.as_str(), Uuid::new_v4().simple());
 
         let mut tx = Transaction::new(
             user_id,
             amount,
-            TransactionKind::TopUp,
+            kind,
             PaymentProvider::Platega,
             order_id.clone(),
         );

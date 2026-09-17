@@ -31,7 +31,7 @@ impl StartTrialCommand {
                 id,
                 SubscriptionPlan::Trial,
                 Utc::now(),
-                Utc::now() + Days::new(5),
+                Utc::now() + Days::new(SubscriptionPlan::Trial.duration_days()),
                 SubscriptionStatus::Active,
                 SubscriptionDevices::new(2)?,
             );

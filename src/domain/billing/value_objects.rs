@@ -123,7 +123,7 @@ impl FromStr for PaymentProvider {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Money(i64);
 
 impl Money {
@@ -137,6 +137,46 @@ impl Money {
     #[must_use]
     pub const fn inner(&self) -> i64 {
         self.0
+    }
+
+    /// Значение в копейках как `f64`.
+    #[must_use]
+    pub const fn as_kopecks_f64(&self) -> f64 {
+        #[allow(clippy::cast_precision_loss)]
+        {
+            self.0 as f64
+        }
+    }
+
+    /// Значение в рублях как `f64`.
+    #[must_use]
+    pub fn as_rubles_f64(&self) -> f64 {
+        self.as_kopecks_f64() / 100.0
+    }
+
+    /// Парсит рубли как `f64` от ВНЕШНЕГО источника (провайдер) в копейки.
+    /// Здесь данные не достоверные отсюда проверки.
+    ///
+    /// # Errors
+    /// Возвращает ошибку, если `rubles` не конечное число
+    /// или выходит за пределы точного представления в `f64`.
+    pub fn try_from_rubles_f64(rubles: f64) -> DomainResult<Self> {
+        const MAX_SAFE_INTEGER: f64 = 9_007_199_254_740_991.0; // 2^53 - 1
+
+        if !rubles.is_finite() {
+            return Err(BillingError::NonFiniteAmount.into());
+        }
+
+        let kopecks: f64 = (rubles * 100.0).round();
+
+        if !(-MAX_SAFE_INTEGER..=MAX_SAFE_INTEGER).contains(&kopecks) {
+            return Err(BillingError::AmountOutOfRange(rubles).into());
+        }
+
+        #[allow(clippy::cast_possible_truncation)]
+        let kopecks_i64: i64 = kopecks as i64;
+
+        Self::new(kopecks_i64)
     }
 }
 

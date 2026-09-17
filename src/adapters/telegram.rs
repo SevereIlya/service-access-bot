@@ -6,6 +6,7 @@ pub mod notifier;
 pub mod router;
 pub mod ui;
 pub mod views;
+pub mod alerts;
 
 pub use callbacks::*;
 pub use commands::*;
@@ -15,6 +16,7 @@ pub use notifier::*;
 pub use router::*;
 pub use ui::*;
 pub use views::*;
+pub use alerts::*;
 
 use crate::application::UseCases;
 use std::sync::Arc;
