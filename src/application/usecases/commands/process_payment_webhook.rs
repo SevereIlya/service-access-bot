@@ -50,11 +50,16 @@ impl ProcessPaymentWebhookCommand {
         }
 
         if state.amount < tx.amount() {
+            tx.mark_failed(Some(state.raw));
+            if let Err(e) = self.transaction_repo.update(&tx).await {
+                error!(error = %e, order_id = tx.order_id(), "Не удалось сохранить факт недоплаты в БД");
+            }
             error!(
                 order_id = tx.order_id(),
+                user_id = %tx.user_id(),
                 expected = %tx.amount(),
                 got = %state.amount,
-                "Провайдер подтвердил сумму МЕНЬШЕ выставленного счёта."
+                "Недоплата: провайдер подтвердил МЕНЬШЕ счёта - не зачислено, нужен ручной разбор"
             );
             return Ok(());
         }
@@ -83,7 +88,12 @@ impl ProcessPaymentWebhookCommand {
             }
             ProviderTxStatus::Chargebacked => {
                 tx.mark_failed(Some(state.raw));
-                error!(order_id = tx.order_id(), "Chargeback - нужен ручной разбор, возможно отозвать доступ");
+                error!(
+                    order_id = tx.order_id(),
+                    user_id = %tx.user_id(),
+                    amount = %tx.amount(),
+                    "Chargeback по висящему платежу - нужен ручной разбор, возможно отозвать доступ"
+                );
             }
         }
 
@@ -263,5 +273,23 @@ mod tests {
         let updated = updated.lock().unwrap();
         assert_eq!(updated.len(), 1);
         assert_eq!(updated[0].status(), TransactionStatus::Success);
+    }
+
+    #[tokio::test]
+    async fn test_underpayment_marks_failed_and_saves_evidence() {
+        let mut state = make_state(ProviderTxStatus::Confirmed);
+        state.amount = Money::new(39_999).unwrap(); // меньше счёта в 40 000
+        let (cmd, updated) = setup(Some(make_tx(TransactionStatus::Pending)), state);
+
+        cmd.execute("platega-123").await.unwrap();
+
+        let updated = updated.lock().unwrap();
+        assert_eq!(
+            updated.len(),
+            1,
+            "недоплата обязана менять статус, а не висеть Pending вечно"
+        );
+        assert_eq!(updated[0].status(), TransactionStatus::Failed, "недоплаченное - не зачислено");
+        assert!(updated[0].payload().is_some(), "сырой ответ с реальной суммой - улика");
     }
 }

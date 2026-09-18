@@ -4,7 +4,7 @@ use axum::Json;
 use axum::extract::State;
 use axum::http::{HeaderMap, StatusCode};
 use serde::Deserialize;
-use tracing::warn;
+use tracing::error;
 
 #[derive(Debug, Deserialize)]
 pub struct PlategaWebhookPayload {
@@ -24,7 +24,7 @@ pub async fn handle_platega_webhook(
     let allowed_ips = &state.config.payments.platega.webhook_allowed_ip;
 
     if !real_ip.is_some_and(|ip| allowed_ips.contains(&ip)) {
-        warn!(?real_ip, expected = ?allowed_ips, "Вебхук Платеги с левого IP");
+        error!(?real_ip, expected = ?allowed_ips, "Вебхук Платеги с левого IP");
         return Err(WebError::Forbidden);
     }
 

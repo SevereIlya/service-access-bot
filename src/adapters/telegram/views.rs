@@ -11,6 +11,7 @@ use crate::adapters::telegram::UiText;
 use crate::adapters::telegram::alerts::{AlertEvent, DEDUP_COOLDOWN};
 use crate::application::AppError;
 use crate::domain::{DomainError, SubscriptionError, UserError, subscription::SubscriptionPlan};
+use std::collections::HashSet;
 use teloxide::types::{InlineKeyboardButton, InlineKeyboardMarkup};
 use teloxide::utils::html::escape;
 
@@ -94,15 +95,18 @@ pub(crate) fn build_alert_view(ui: &UiText, alert: &AlertEvent, suppressed: usiz
     head.push_str(&module_line);
     blocks.push(head);
 
-    if !alert.fields.is_empty() {
-        let lines: Vec<String> = alert
-            .fields
+    let mut context: Vec<(String, String)> = Vec::new();
+    let mut seen: HashSet<String> = HashSet::new();
+    for (name, value) in alert.fields.iter().chain(alert.span_fields.iter()) {
+        if seen.insert(name.clone()) {
+            context.push((escape(name), escape(value)));
+        }
+    }
+    if !context.is_empty() {
+        let lines: Vec<String> = context
             .iter()
             .map(|(name, value)| {
-                ui.alert
-                    .alert_context_line
-                    .replace("{name}", &escape(name))
-                    .replace("{value}", &escape(value))
+                ui.alert.alert_context_line.replace("{name}", name).replace("{value}", value)
             })
             .collect();
         blocks.push(format!(

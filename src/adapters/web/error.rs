@@ -4,7 +4,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use thiserror::Error;
-use tracing::warn;
+use tracing::{error, warn};
 
 pub type WebResult<T> = Result<T, WebError>;
 
@@ -26,7 +26,10 @@ impl IntoResponse for WebError {
             Self::Forbidden => StatusCode::FORBIDDEN,
             Self::App(_) => StatusCode::INTERNAL_SERVER_ERROR,
         };
-        warn!(error = %self, "Веб-адаптер выдал ошибку");
+        match &self {
+            Self::App(e) => error!(error = %e, "Веб-адаптер: сбой обработки запроса"),
+            Self::Forbidden | Self::NotFound => warn!(error = %self, "Веб-адаптер отклонил запрос"),
+        }
         status.into_response()
     }
 }

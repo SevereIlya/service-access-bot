@@ -71,7 +71,7 @@ mod tests {
             unreachable!("find_lapsed_active() не используется в этом юзкейсе")
         }
         async fn find_due_for_expiry_warning(&self) -> DomainResult<Vec<Subscription>> {
-            unreachable!("find_expiring_between() не используется в этом юзкейсе")
+            unreachable!("find_due_for_expiry_warning() не используется в этом юзкейсе")
         }
     }
 
