@@ -35,7 +35,11 @@ impl PurchaseTariffCommand {
         in_transaction!(self.uow, |tx| {
             let balance = tx.transactions().balance_for_user(user_id).await?;
             if balance < price {
-                return Err(DomainError::Billing(BillingError::InsufficientBalance).into());
+                return Err(DomainError::Billing(BillingError::InsufficientBalance {
+                    required: price,
+                    available: balance,
+                })
+                .into());
             }
 
             let purchase_tx = Transaction::new_completed(user_id, price, kind, order_id.clone());
@@ -386,10 +390,19 @@ mod tests {
             .await;
 
         assert!(result.is_err());
-        assert!(matches!(
-            result.unwrap_err(),
-            AppError::Domain(DomainError::Billing(BillingError::InsufficientBalance))
-        ));
+        match result.unwrap_err() {
+            AppError::Domain(DomainError::Billing(BillingError::InsufficientBalance {
+                required,
+                available,
+            })) => {
+                assert_eq!(available, Money::new(0).unwrap());
+                assert!(
+                    required.inner() > 0,
+                    "цена тарифа должна быть положительной"
+                );
+            }
+            other => panic!("Ожидалась BillingError::InsufficientBalance, получено {other:?}"),
+        }
         assert!(
             *begin_called.lock().unwrap(),
             "транзакция должна была открыться перед проверкой баланса"

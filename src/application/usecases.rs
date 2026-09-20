@@ -32,6 +32,7 @@ pub struct UseCases {
     pub get_profile: Arc<GetProfileQuery>,
     pub get_user_by_telegram_id: Arc<GetUserByTelegramIdQuery>,
     pub get_user_by_subscription_token: Arc<GetUserBySubscriptionTokenQuery>,
+    pub get_purchase_quote: Arc<GetPurchaseQuoteQuery>,
 }
 
 impl UseCases {
@@ -77,7 +78,7 @@ impl UseCases {
             SendExpiryWarningsCommand::new(
                 subscription_repo.clone(),
                 user_repo.clone(),
-                notifier,
+                notifier.clone(),
             )
         );
         let issue_vpn_config = Arc::new(
@@ -97,8 +98,10 @@ impl UseCases {
         );
         let process_payment_webhook = Arc::new(
             ProcessPaymentWebhookCommand::new(
-                transaction_repo,
+                transaction_repo.clone(),
                 payment_gateway,
+                user_repo.clone(),
+                notifier,
             )
         );
         let purchase_tariff = Arc::new(
@@ -128,6 +131,11 @@ impl UseCases {
                 user_repo
             )
         );
+        let get_purchase_quote = Arc::new(
+            GetPurchaseQuoteQuery::new(
+                transaction_repo
+            )
+        );
 
         Self {
             register_user,
@@ -142,6 +150,7 @@ impl UseCases {
             get_profile,
             get_user_by_telegram_id,
             get_user_by_subscription_token,
+            get_purchase_quote,
         }
     }
 }

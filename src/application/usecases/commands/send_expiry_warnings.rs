@@ -179,6 +179,9 @@ mod tests {
             }
             Ok(())
         }
+        async fn notify_balance_topped_up(&self, _user: &User, _amount: Money, _new_balance: Money) -> DomainResult<()> {
+            unreachable!("notify_balance_topped_up() не используется в этом юзкейсе")
+        }
     }
 
     // ==========================================

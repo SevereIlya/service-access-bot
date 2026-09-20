@@ -24,7 +24,7 @@ pub async fn handle_menu(
         MenuAction::StartTrial => handle_start_trial(bot, msg, state).await?,
         MenuAction::MyVpn => handle_my_vpn(bot, msg, state).await?,
         MenuAction::Profile => handle_profile(bot, msg, state).await?,
-        MenuAction::Tariffs => handle_tariffs(bot, msg, state).await?,
+        MenuAction::Tariffs(devices) => handle_tariffs(bot, msg, state, devices).await?,
         MenuAction::About => handle_about(bot, msg, state).await?,
         MenuAction::Referral => handle_referral(bot, msg, state).await?,
         MenuAction::Help => handle_help(bot, msg, state).await?,
@@ -42,7 +42,6 @@ pub async fn handle_start_trial(
     state: BotState,
 ) -> TelegramResult<()> {
     let chat_id = msg.chat().id;
-    let message_id = msg.id();
     let telegram_id = chat_id.0;
 
     let Some(user) = state.usecases.get_user_by_telegram_id.execute(telegram_id).await? else {
@@ -61,23 +60,7 @@ pub async fn handle_start_trial(
     match state.usecases.start_trial.execute(user).await {
         Ok(subscription) => {
             let view = views::build_trial_success_view(&state.ui_text, subscription.expires_at());
-
-            let is_media = msg
-                .regular_message()
-                .is_some_and(|m| m.photo().is_some() || m.document().is_some());
-
-            if is_media {
-                let _ = bot.delete_message(chat_id, message_id).await;
-                bot.send_message(chat_id, view.text)
-                    .parse_mode(Html)
-                    .reply_markup(view.keyboard)
-                    .await?;
-            } else {
-                bot.edit_message_text(chat_id, message_id, view.text)
-                    .parse_mode(Html)
-                    .reply_markup(view.keyboard)
-                    .await?;
-            }
+            render_view(&bot, &msg, view).await?;
         }
         Err(e) => {
             warn!(error = ?e, telegram_id, "Отказ в выдаче триала");
@@ -159,7 +142,6 @@ pub async fn show_main_menu(
     drop_down: bool,
 ) -> TelegramResult<()> {
     let chat_id = msg.chat().id;
-    let message_id = msg.id();
     let telegram_id = chat_id.0;
 
     let Some(user) = state.usecases.get_user_by_telegram_id.execute(telegram_id).await? else {
@@ -180,23 +162,17 @@ pub async fn show_main_menu(
         views::build_main_menu_view(&state.ui_text, menu_state.can_trial)
     };
 
-    let is_media = msg
-        .regular_message()
-        .is_some_and(|m| m.photo().is_some() || m.document().is_some());
-
-    if drop_down || is_media {
+    if drop_down {
+        let message_id = msg.id();
         let _ = bot.delete_message(chat_id, message_id).await;
         bot.send_message(chat_id, view.text)
             .parse_mode(Html)
             .reply_markup(view.keyboard)
             .await?;
-    } else {
-        bot.edit_message_text(chat_id, message_id, view.text)
-            .parse_mode(Html)
-            .reply_markup(view.keyboard)
-            .await?;
+        return Ok(());
     }
-    Ok(())
+
+    render_view(&bot, &msg, view).await
 }
 
 pub async fn handle_about(

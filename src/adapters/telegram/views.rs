@@ -7,16 +7,24 @@ pub use menu::*;
 pub use profile::*;
 pub use purchase::*;
 
-use crate::adapters::telegram::UiText;
-use crate::adapters::telegram::alerts::{AlertEvent, DEDUP_COOLDOWN};
+use crate::adapters::telegram::{
+    UiText,
+    alerts::{AlertEvent, DEDUP_COOLDOWN},
+};
 use crate::application::AppError;
-use crate::domain::{DomainError, SubscriptionError, UserError, subscription::SubscriptionPlan};
+use crate::domain::{
+    DomainError, SubscriptionError, UserError, billing::Money, subscription::SubscriptionPlan,
+};
 use std::collections::HashSet;
 use teloxide::types::{InlineKeyboardButton, InlineKeyboardMarkup};
 use teloxide::utils::html::escape;
 
 /// Лимит Telegram 4096 символов; оставляем запас под обрезку.
 const MAX_ALERT_LEN: usize = 4000;
+
+pub(crate) fn format_rub(money: Money) -> String {
+    format!("{:.0}", money.as_rubles_f64())
+}
 
 pub(crate) fn plan_label(ui: &UiText, plan: SubscriptionPlan) -> String {
     match plan {

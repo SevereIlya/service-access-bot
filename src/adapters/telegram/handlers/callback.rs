@@ -2,10 +2,18 @@ use crate::adapters::telegram::{
     BotState, CallbackAction, TelegramResult, handlers::menu, handlers::purchase,
 };
 use teloxide::prelude::*;
-use tracing::{info, instrument, warn};
+use tracing::{error, info, instrument, warn};
+
+pub async fn callback_handler(bot: Bot, qry: CallbackQuery, state: BotState) -> TelegramResult<()> {
+    let telegram_id = qry.from.id.0;
+    if let Err(e) = callback_handler_inner(bot, qry, state).await {
+        error!(error = %e, telegram_id, "Необработанная ошибка в callback_handler");
+    }
+    Ok(())
+}
 
 #[instrument(skip_all, fields(telegram_id = qry.from.id.0))]
-pub async fn callback_handler(bot: Bot, qry: CallbackQuery, state: BotState) -> TelegramResult<()> {
+pub async fn callback_handler_inner(bot: Bot, qry: CallbackQuery, state: BotState) -> TelegramResult<()> {
     let Some(data) = qry.data.clone() else {
         return Ok(());
     };

@@ -1,3 +1,4 @@
+use crate::domain::billing::Money;
 use thiserror::Error;
 
 pub type DomainResult<T> = Result<T, DomainError>;
@@ -28,8 +29,8 @@ pub enum BillingError {
     #[error("Entity has no ID. It must be saved to the database first.")]
     EntityNotSaved,
 
-    #[error("Insufficient balance")]
-    InsufficientBalance,
+    #[error("Insufficient balance: required {required}, available {available}")]
+    InsufficientBalance { required: Money, available: Money },
 
     #[error("Invalid amount: {0}")]
     InvalidAmount(i64),

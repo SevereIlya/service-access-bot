@@ -24,7 +24,11 @@ pub struct MsgText {
     pub msg_help: String,
     pub msg_about: String,
     pub msg_tariffs_select: String,
-    pub msg_tariff_details: String,
+    pub msg_purchase_confirm: String,
+    pub msg_purchase_insufficient: String,
+    pub msg_top_up_link: String,
+    pub msg_purchase_success: String,
+    pub msg_balance_topped_up: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -44,6 +48,8 @@ pub struct ButtonText {
     pub btn_tariff_month_6: String,
     pub btn_pay: String,
     pub btn_back: String,
+    pub btn_top_up_amount: String,
+    pub btn_open_payment: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]

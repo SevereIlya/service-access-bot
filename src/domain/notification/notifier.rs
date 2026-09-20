@@ -1,4 +1,5 @@
 use crate::domain::DomainResult;
+use crate::domain::billing::Money;
 use crate::domain::user::User;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -17,5 +18,13 @@ pub trait Notifier: Send + Sync {
         &self,
         user: &User,
         expires_at: DateTime<Utc>,
+    ) -> DomainResult<()>;
+
+    /// Уведомляет о зачислении пополнения баланса.
+    async fn notify_balance_topped_up(
+        &self,
+        user: &User,
+        amount: Money,
+        new_balance: Money,
     ) -> DomainResult<()>;
 }

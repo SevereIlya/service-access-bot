@@ -3,7 +3,7 @@ pub enum MenuAction {
     StartTrial,
     MyVpn,
     Profile,
-    Tariffs,
+    Tariffs(i32),
     About,
     Referral,
     Help,
@@ -16,7 +16,10 @@ impl MenuAction {
             "trial" => Some(Self::StartTrial),
             "myvpn" => Some(Self::MyVpn),
             "profile" => Some(Self::Profile),
-            "tariffs" => Some(Self::Tariffs),
+            "tariffs" => {
+                let devices = parts.next().and_then(|s| s.parse::<i32>().ok()).unwrap_or(1);
+                Some(Self::Tariffs(devices))
+            }
             "about" => Some(Self::About),
             "referral" => Some(Self::Referral),
             "help" => Some(Self::Help),

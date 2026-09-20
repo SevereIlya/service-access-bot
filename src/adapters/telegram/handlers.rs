@@ -5,13 +5,15 @@ mod message;
 mod profile;
 mod purchase;
 
+use crate::adapters::telegram::TelegramResult;
 pub use callback::callback_handler;
 pub use message::message_handler;
-
-use crate::adapters::telegram::TelegramResult;
-use teloxide::prelude::*;
-use teloxide::types::{MaybeInaccessibleMessage, ParseMode::Html};
-use teloxide::sugar::request::RequestLinkPreviewExt;
+use teloxide::{
+    ApiError, RequestError,
+    prelude::*,
+    sugar::request::RequestLinkPreviewExt,
+    types::{MaybeInaccessibleMessage, ParseMode::Html},
+};
 
 pub struct MessageView {
     pub text: String,
@@ -36,11 +38,17 @@ pub(crate) async fn render_view(
             .reply_markup(view.keyboard)
             .await?;
     } else {
-        bot.edit_message_text(chat_id, message_id, view.text)
+        let result = bot
+            .edit_message_text(chat_id, message_id, view.text)
             .parse_mode(Html)
             .disable_link_preview(true)
             .reply_markup(view.keyboard)
-            .await?;
+            .await;
+
+        if let Err(RequestError::Api(ApiError::MessageNotModified)) = result {
+            return Ok(());
+        }
+        result?;
     }
     Ok(())
 }
