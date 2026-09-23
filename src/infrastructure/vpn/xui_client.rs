@@ -1,6 +1,6 @@
 use anyhow::anyhow;
 use reqwest::header::{AUTHORIZATION, HeaderMap, HeaderValue};
-use reqwest::{Client, RequestBuilder, Url};
+use reqwest::{Client, RequestBuilder, StatusCode, Url};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::time::Duration;
@@ -99,21 +99,43 @@ impl XuiClient {
     ///
     /// Метод является общей точкой обработки всех запросов к 3x-ui:
     ///
-    /// 1. Отправляет переданный `RequestBuilder`.
-    /// 2. Читает тело HTTP-ответа целиком.
-    /// 3. Десериализует тело в [`XuiResponse`].
-    /// 4. Проверяет поле `success` в ответе API.
+    /// 1. Отправляет переданный [`RequestBuilder`].
+    /// 2. Проверяет HTTP-статус ответа.
+    /// 3. Читает тело HTTP-ответа целиком.
+    /// 4. Десериализует тело в [`XuiResponse`].
+    /// 5. Проверяет поле `success` в ответе API.
+    ///
+    /// Для 3x-ui v3.8.0+:
+    ///
+    /// - `401 Unauthorized` означает, что Bearer-токен не прошёл проверку;
+    /// - `403 Forbidden` означает недостаточные права токена для запрошенного endpoint.
     ///
     /// Если `success` равен `true`, возвращает десериализованный ответ.
     /// Если `success` равен `false`, возвращает ошибку с сообщением из поля `msg`.
     ///
     /// При ошибке десериализации в сообщение включается HTTP-статус и первые 200 символов тела ответа. Если тело пустое, вместо него указывается `пустое тело ответа`.
     ///
-    /// Ошибки отправки запроса и чтения тела возвращаются напрямую.
-    /// Ошибка десериализации ответа и ответ панели с `success: false` преобразуются в [`anyhow::Error`].
+    /// Возвращает ошибку отправки запроса, чтения тела, HTTP-ошибки аутентификации/авторизации, ошибки десериализации ответа или API-ошибки с `success: false`.
     async fn request(&self, builder: RequestBuilder) -> anyhow::Result<XuiResponse> {
         let response = builder.send().await?;
         let status = response.status();
+
+        match status {
+            StatusCode::UNAUTHORIZED => {
+                return Err(anyhow!(
+                    "3x-ui отклонил API-токен ноды (401 Unauthorized): \
+                    токен невалиден, отключён или истёк"
+                ));
+            }
+            StatusCode::FORBIDDEN => {
+                return Err(anyhow!(
+                    "3x-ui отклонил запрос ноды (403 Forbidden): \
+                    API-токен не имеет необходимых прав доступа"
+                ));
+            }
+            _ => {}
+        }
+
         let raw_text = response.text().await?;
 
         let xui_response: XuiResponse = serde_json::from_str(&raw_text).map_err(|e| {
@@ -139,96 +161,127 @@ impl XuiClient {
     ///
     /// Метод ищет клиента по `email` через `GET /panel/api/clients/get/:email`.
     ///
-    /// Если клиент не найден (API возвращает ошибку `record not found`):
+    /// Если клиент не найден (`record not found`):
     /// - создаётся новый клиент через [`Self::add`];
-    /// - сразу привязывается ко всем `required_inbounds`.
+    /// - при успешном создании метод завершается;
+    /// - если `add` завершился ошибкой, выполняется одна повторная проверка наличия клиента;
+    /// - если клиент всё же существует, выполняется сверка его состояния.
+    ///
+    /// Последний сценарий необходим для 3x-ui v3.8.0+, где операции с несколькими `inboundIds` применяются независимо:
+    /// `success: false` не гарантирует полного отката уже выполненных изменений.
     ///
     /// Если клиент найден:
-    /// - обновляет его конфиг через [`Self::update`];
-    /// - сравнивает существующие `inboundIds` с `required_inbounds`;
-    /// - привязывает клиента только к отсутствующим инбаундам через [`Self::attach`].
+    /// - обновляется его конфиг через [`Self::update`];
+    /// - сравниваются существующие `inboundIds` с `required_inbounds`;
+    /// - клиент привязывается только к отсутствующим инбаундам через [`Self::attach`].
     ///
     /// Существующие привязки не удаляются.
     ///
-    /// Для существующего клиента ответ API должен содержать в поле `obj` JSON-объект с непустым массивом `inboundIds`.
-    /// Каждый элемент массива должен содержать целочисленный ID, представимый как [`i32`].
-    /// Пустой `inboundIds` считается некорректным ответом API.
+    /// Пустой `inboundIds` считается допустимым состоянием существующего клиента.
+    /// В этом случае сверка просто обновляет клиента и привязывает все `required_inbounds`.
     ///
     /// # Errors
     ///
     /// Возвращает ошибку, если:
     /// - не удалось выполнить запрос или разобрать ответ API;
     /// - API вернул неожидаемый формат `obj`;
-    /// - у существующего клиента отсутствует `inboundIds`, либо оно не является массивом;
-    /// - `inboundIds` пуст или содержит невалидный ID;
-    /// - не удалось создать, обновить клиента или привязать его к инбаундам.
+    /// - у найденного клиента отсутствует `inboundIds`, либо оно не является массивом;
+    /// - `inboundIds` содержит невалидный ID;
+    /// - `add` завершился ошибкой, клиент при повторной проверке не найден, а исходную ошибку нельзя устранить автоматически;
+    /// - не удалось обновить клиента или привязать его к инбаундам.
     pub async fn upsert(
         &self,
         required_inbounds: Vec<i32>,
         email: &str,
         config: &ClientObj,
     ) -> anyhow::Result<()> {
+        match self.fetch_existing_inbounds(email).await? {
+            Some(existing_inbounds) => {
+                self.reconcile(email, config, &required_inbounds, &existing_inbounds).await
+            }
+            None => match self.add(required_inbounds.clone(), config).await {
+                Ok(()) => {
+                    info!(email, ?required_inbounds, "Новый клиент создан");
+                    Ok(())
+                }
+                Err(add_err) => match self.fetch_existing_inbounds(email).await {
+                    Ok(Some(existing_inbounds)) => {
+                        info!(email, error = %add_err, "add() завершился ошибкой, но клиент обнаружен - выполняю сверку");
+                        self.reconcile(email, config, &required_inbounds, &existing_inbounds).await
+                    }
+                    Ok(None) => Err(add_err),
+                    Err(probe_err) => Err(anyhow!(
+                        "Не удалось создать клиента в 3x-ui: {add_err}; \
+                        повторная проверка существования клиента также завершилась ошибкой: {probe_err}"
+                    )),
+                },
+            },
+        }
+    }
+
+    /// Возвращает список `inboundIds`, к которым уже привязан клиент с данным `email`,
+    /// либо `None`, если клиент не найден (`record not found`).
+    ///
+    /// Для найденного клиента ответ API должен содержать в поле `obj` JSON-объект с массивом `inboundIds`.
+    /// Пустой массив допускается: он означает существующего клиента без текущих привязок к инбаундам.
+    ///
+    /// Каждый элемент массива должен содержать целочисленный ID как [`i32`].
+    async fn fetch_existing_inbounds(&self, email: &str) -> anyhow::Result<Option<Vec<i32>>> {
         let get_url = self.build_url(&["panel", "api", "clients", "get", email])?;
 
-        let response_result = self.request(self.client.get(get_url)).await;
-
-        let existing_inbounds: Option<Vec<i32>> = match response_result {
+        match self.request(self.client.get(get_url)).await {
             Ok(response) => match response.obj {
                 Some(Value::Object(map)) => {
                     let inbounds_array =
-                        map.get("inboundIds").and_then(|v| v.as_array()).ok_or_else(|| {
+                        map.get("inboundIds").and_then(Value::as_array).ok_or_else(|| {
                             anyhow!("API вернул клиента, но 'inboundIds' отсутствует или не массив")
                         })?;
 
                     let ids: Vec<i32> = inbounds_array
                         .iter()
-                        .map(|v| {
-                            v.as_i64().and_then(|id| i32::try_from(id).ok()).ok_or_else(|| {
+                        .map(|value| {
+                            value.as_i64().and_then(|id| i32::try_from(id).ok()).ok_or_else(|| {
                                 anyhow!("Массив 'inboundIds' содержит невалидный ID")
                             })
                         })
                         .collect::<anyhow::Result<_>>()?;
 
-                    if ids.is_empty() {
-                        return Err(anyhow!("Массив 'inboundIds' пуст или содержит не числа"));
-                    }
-
-                    Some(ids)
+                    Ok(Some(ids))
                 }
-                _ => {
-                    return Err(anyhow!(
-                        "Неожиданный формат 'obj' в ответе API: ожидался массив"
-                    ));
-                }
+                _ => Err(anyhow!(
+                    "Неожиданный формат 'obj' в ответе API: ожидался JSON-объект клиента"
+                )),
             },
-            Err(e) => {
-                let err_msg = e.to_string();
-                if err_msg.contains(ERR_RECORD_NOT_FOUND) {
-                    None
-                } else {
-                    return Err(e);
-                }
-            }
-        };
+            Err(error) if error.to_string().contains(ERR_RECORD_NOT_FOUND) => Ok(None),
+            Err(error) => Err(error),
+        }
+    }
 
-        if let Some(existing) = existing_inbounds {
-            self.update(email, config).await?;
-            info!(email, "Метаданные клиента обновлены");
+    /// Обновляет метаданные клиента и привязывает его к отсутствующим из `required` инбаундам.
+    ///
+    /// Используется как для обычного сценария существующего клиента,
+    /// так и для сверки после частично успешного [`Self::add`].
+    async fn reconcile(
+        &self,
+        email: &str,
+        config: &ClientObj,
+        required: &[i32],
+        existing: &[i32],
+    ) -> anyhow::Result<()> {
+        self.update(email, config).await?;
+        info!(email, "Метаданные клиента обновлены");
 
-            let missing_inbounds: Vec<i32> =
-                required_inbounds.into_iter().filter(|id| !existing.contains(id)).collect();
+        let missing_inbounds: Vec<i32> =
+            required.iter().copied().filter(|id| !existing.contains(id)).collect();
 
-            if !missing_inbounds.is_empty() {
-                self.attach(email, missing_inbounds.clone()).await?;
-                info!(
-                    email,
-                    ?missing_inbounds,
-                    "Клиент привязан к новым инбаундам"
-                );
-            }
-        } else {
-            self.add(required_inbounds.clone(), config).await?;
-            info!(email, ?required_inbounds, "Новый клиент создан");
+        if !missing_inbounds.is_empty() {
+            self.attach(email, missing_inbounds.clone()).await?;
+
+            info!(
+                email,
+                ?missing_inbounds,
+                "Клиент привязан к новым инбаундам"
+            );
         }
 
         Ok(())
@@ -338,7 +391,10 @@ impl XuiClient {
                 client_obj.insert("enable".to_string(), Value::Bool(false));
 
                 let update_url = self.build_url(&["panel", "api", "clients", "update", &email])?;
-                self.request(self.client.post(update_url).json(client_obj)).await?;
+                self.request(
+                    self.client.post(update_url).json(client_obj).timeout(Duration::from_secs(30)),
+                )
+                .await?;
 
                 info!(
                     email,

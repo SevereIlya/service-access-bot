@@ -10,6 +10,7 @@ pub struct ProfileSnapshot {
     pub telegram_id: i64,
     pub referral_code: String,
     pub subscription: Option<ProfileSubscription>,
+    // TODO(billing): balance_main / balance_referral — когда ledger встанет на Platega, тут появится вызов transaction_repo.balance_for_user().
 }
 
 pub struct ProfileSubscription {

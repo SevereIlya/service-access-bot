@@ -45,7 +45,7 @@ pub(crate) async fn render_view(
             .reply_markup(view.keyboard)
             .await;
 
-        if let Err(RequestError::Api(ApiError::MessageNotModified)) = result {
+        if matches!(result, Err(RequestError::Api(ApiError::MessageNotModified))) {
             return Ok(());
         }
         result?;
