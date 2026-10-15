@@ -2,11 +2,14 @@ use crate::domain::billing::TransactionId;
 use crate::domain::{
     DomainError,
     billing::{Money, Transaction},
+    device::{Device, DeviceFingerprint, DeviceId, DeviceName, DeviceSignal},
     subscription::{Subscription, SubscriptionDevices, SubscriptionId},
     user::{DiscountPercent, ReferralCode, SubscriptionToken, TelegramId, User, UserId},
     vpn::{Node, NodeId, VpnConnection, VpnConnectionId},
 };
-use crate::infrastructure::{NodeRow, SubscriptionRow, TransactionRow, UserRow, VpnConnectionRow};
+use crate::infrastructure::{
+    DeviceRow, NodeRow, SubscriptionRow, TransactionRow, UserRow, VpnConnectionRow,
+};
 
 impl TryFrom<UserRow> for User {
     type Error = DomainError;
@@ -43,6 +46,29 @@ impl TryFrom<SubscriptionRow> for Subscription {
             SubscriptionDevices::new(row.devices)?,
             row.is_warning_sent,
             row.created_at,
+        ))
+    }
+}
+
+impl TryFrom<DeviceRow> for Device {
+    type Error = DomainError;
+
+    fn try_from(row: DeviceRow) -> Result<Self, Self::Error> {
+        Ok(Self::restore_from_db(
+            DeviceId::new(row.id),
+            UserId::new(row.user_id),
+            DeviceFingerprint::new(row.fingerprint),
+            DeviceName::restore(row.name),
+            DeviceSignal::new(
+                row.hardware_id,
+                row.os_name,
+                row.os_version,
+                row.device_model,
+                row.user_agent,
+            ),
+            row.status.parse()?,
+            row.first_seen_at,
+            row.last_seen_at,
         ))
     }
 }

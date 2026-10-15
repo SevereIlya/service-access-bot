@@ -55,14 +55,14 @@ impl StartTrialCommand {
 mod tests {
     use super::*;
     use crate::application::AppError;
+    use crate::domain::billing::DynTransactionRepository;
     use crate::domain::{
         DomainResult,
         billing::Money,
         subscription::{DynSubscriptionRepository, SubscriptionRepository},
         uow::{BoxedUowContext, UnitOfWork, UowContext},
         user::{
-            DynUserRepository, ReferralCode, SubscriptionToken, TelegramId, UserId,
-            UserRepository,
+            DynUserRepository, ReferralCode, SubscriptionToken, TelegramId, UserId, UserRepository,
         },
         vpn::{DynNodeRepository, DynVpnConnectionRepository},
     };
@@ -70,7 +70,6 @@ mod tests {
     use chrono::Months;
     use std::sync::{Arc, Mutex};
     use uuid::Uuid;
-    use crate::domain::billing::DynTransactionRepository;
     // ==========================================
     // Моки
     // ==========================================
@@ -97,7 +96,10 @@ mod tests {
         ) -> DomainResult<Option<User>> {
             Ok(None)
         }
-        async fn find_by_subscription_token(&self, _token: &SubscriptionToken) -> DomainResult<Option<User>> {
+        async fn find_by_subscription_token(
+            &self,
+            _token: &SubscriptionToken,
+        ) -> DomainResult<Option<User>> {
             unreachable!("find_by_subscription_token() не используется в этом юзкейсе")
         }
     }

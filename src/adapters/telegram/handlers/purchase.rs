@@ -105,8 +105,13 @@ async fn handle_pay(
             );
             render_view(&bot, &msg, view).await
         }
-        Err(AppError::Domain(DomainError::Billing(BillingError::InsufficientBalance { .. }))) => {
-            info!(?plan, devices, "Баланс изменился между показом и оплатой, перерисовываю");
+        Err(AppError::Domain(DomainError::Billing(BillingError::InsufficientBalance {
+            ..
+        }))) => {
+            info!(
+                ?plan,
+                devices, "Баланс изменился между показом и оплатой, перерисовываю"
+            );
             show_purchase_quote(bot, msg, state, plan, devices).await
         }
         Err(e) => {

@@ -15,12 +15,12 @@ use sqlx::{PgPool, Postgres, Transaction};
 use std::sync::Arc;
 use tokio::sync::{Mutex, MutexGuard};
 
+#[must_use]
 pub struct SqlxUnitOfWork {
     pool: PgPool,
 }
 
 impl SqlxUnitOfWork {
-    #[must_use]
     pub const fn new(pool: PgPool) -> Self {
         Self { pool }
     }

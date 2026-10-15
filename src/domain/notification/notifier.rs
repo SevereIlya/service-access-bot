@@ -1,5 +1,6 @@
 use crate::domain::DomainResult;
 use crate::domain::billing::Money;
+use crate::domain::device::{DeviceName, DeviceSetupCode};
 use crate::domain::user::User;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -26,5 +27,20 @@ pub trait Notifier: Send + Sync {
         user: &User,
         amount: Money,
         new_balance: Money,
+    ) -> DomainResult<()>;
+
+    /// Уведомляет о новом устройстве, зарегистрированном по HWID.
+    async fn notify_new_device_detected(
+        &self,
+        user: &User,
+        device_name: &DeviceName,
+    ) -> DomainResult<()>;
+
+    /// Отправляет код для устройства в статусе `Pending` с инструкцией, куда его вписать.
+    async fn notify_device_setup_code(
+        &self,
+        user: &User,
+        device_name: &DeviceName,
+        code: &DeviceSetupCode,
     ) -> DomainResult<()>;
 }

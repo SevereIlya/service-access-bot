@@ -1,10 +1,12 @@
 use crate::adapters::{
-    telegram::{BotState, TelegramNotifier, UiText},
+    UiText,
+    telegram::{BotState, TelegramNotifier},
     web::WebState,
 };
 use crate::application::UseCases;
 use crate::domain::{
     billing::{DynPaymentGateway, DynTransactionRepository, Money},
+    device::DynDeviceRepository,
     notification::DynNotifier,
     subscription::DynSubscriptionRepository,
     uow::DynUnitOfWork,
@@ -15,7 +17,7 @@ use crate::domain::{
     },
 };
 use crate::infrastructure::{
-    AppConfig, ClashConfigGenerator, PlategaGateway, SqlxNodeRepository,
+    AppConfig, ClashConfigGenerator, PlategaGateway, SqlxDeviceRepository, SqlxNodeRepository,
     SqlxSubscriptionRepository, SqlxTransactionRepository, SqlxUnitOfWork, SqlxUserRepository,
     SqlxVpnConnectionRepository, XuiAccessRevoker, XuiProvisioner,
 };
@@ -31,24 +33,47 @@ pub struct AppState {
 }
 
 impl AppState {
+    #[rustfmt::skip]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "composition root: линейная сборка зависимостей, дробить нечего"
+    )]
     pub async fn build() -> anyhow::Result<Self> {
-        let config = Arc::new(AppConfig::load()?);
-        let ui_text = Arc::new(UiText::load("locales/ru.toml")?);
+        let config = Arc::new(
+            AppConfig::load()?
+        );
+        let ui_text = Arc::new(
+            UiText::load("locales/ru.toml")?
+        );
+        let stub_text = Arc::new(
+            ui_text.stub.clone(),
+        );
         info!("Конфигурация загружена");
 
-        let pool =
-            crate::infrastructure::postgres::create_pg_pool(&config.general.database_url).await?;
+        let pool = crate::infrastructure::postgres::create_pg_pool(&config.general.database_url).await?;
         info!("Подключение к БД установлено");
 
-        let user_repo: DynUserRepository = Arc::new(SqlxUserRepository::new(pool.clone()));
-        let subscription_repo: DynSubscriptionRepository =
-            Arc::new(SqlxSubscriptionRepository::new(pool.clone()));
-        let node_repo: DynNodeRepository = Arc::new(SqlxNodeRepository::new(pool.clone()));
-        let vpn_connection_repo: DynVpnConnectionRepository =
-            Arc::new(SqlxVpnConnectionRepository::new(pool.clone()));
-        let transaction_repo: DynTransactionRepository =
-            Arc::new(SqlxTransactionRepository::new(pool.clone()));
-        let uow: DynUnitOfWork = Arc::new(SqlxUnitOfWork::new(pool.clone()));
+        let user_repo: DynUserRepository = Arc::new(
+            SqlxUserRepository::new(pool.clone())
+        );
+        let subscription_repo: DynSubscriptionRepository = Arc::new(
+            SqlxSubscriptionRepository::new(pool.clone())
+        );
+        let device_repo: DynDeviceRepository = Arc::new(
+            SqlxDeviceRepository::new(pool.clone())
+        );
+        let node_repo: DynNodeRepository = Arc::new(
+            SqlxNodeRepository::new(pool.clone())
+        );
+        let vpn_connection_repo: DynVpnConnectionRepository = Arc::new(
+            SqlxVpnConnectionRepository::new(pool.clone())
+        );
+        let transaction_repo: DynTransactionRepository = Arc::new(
+            SqlxTransactionRepository::new(pool.clone())
+        );
+        let uow: DynUnitOfWork = Arc::new(
+            SqlxUnitOfWork::new(pool)
+        );
         debug!("Инициализация репозиториев завершена");
 
         let bot = Bot::new(&config.general.telegram_token);
@@ -58,20 +83,41 @@ impl AppState {
         let bot_username = me.username().to_string();
         info!(username = %bot_username, "Авторизация в Telegram успешна");
 
-        let notifier: DynNotifier = Arc::new(TelegramNotifier::new(bot.clone(), ui_text.clone()));
-        let vpn_revoker: DynVpnAccessRevoker = Arc::new(XuiAccessRevoker::new(&config)?);
-        let vpn_provisioner: DynVpnProvisioner = Arc::new(XuiProvisioner::new(&config)?);
-        let config_generator: DynVpnConfigGenerator =
-            Arc::new(ClashConfigGenerator::new(config.clone()));
+        let notifier: DynNotifier = Arc::new(
+            TelegramNotifier::new(
+                bot.clone(),
+                ui_text.clone()
+            )
+        );
+        let vpn_revoker: DynVpnAccessRevoker = Arc::new(
+            XuiAccessRevoker::new(
+                &config
+            )?
+        );
+        let vpn_provisioner: DynVpnProvisioner = Arc::new(
+            XuiProvisioner::new(
+                &config
+            )?
+        );
+        let config_generator: DynVpnConfigGenerator = Arc::new(
+            ClashConfigGenerator::new(
+                config.clone()
+            )
+        );
         info!("VPN-адаптеры инициализированы");
 
-        let payment_gateway: DynPaymentGateway = Arc::new(PlategaGateway::new(config.payments.platega.clone())?);
+        let payment_gateway: DynPaymentGateway = Arc::new(
+            PlategaGateway::new(
+                config.payments.platega.clone()
+            )?
+        );
         info!("PlategaGateway инициализирован");
 
         debug!("Инициализация юзкейсов приложения");
         let usecases = Arc::new(UseCases::new(
             user_repo,
             subscription_repo,
+            device_repo,
             node_repo,
             vpn_connection_repo,
             transaction_repo,
@@ -96,6 +142,7 @@ impl AppState {
         let web_state = WebState {
             usecases,
             config: config.clone(),
+            stub_text,
         };
 
         Ok(Self {

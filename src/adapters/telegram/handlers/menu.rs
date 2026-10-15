@@ -193,11 +193,18 @@ pub async fn handle_referral(
     let telegram_id = chat_id.0;
     let Some(user) = state.usecases.get_user_by_telegram_id.execute(telegram_id).await? else {
         warn!(error = ?DomainError::User(NotFound), telegram_id, "Пользователь не найден");
-        let text = message_error(&state.ui_text, &AppError::Domain(DomainError::User(NotFound)));
+        let text = message_error(
+            &state.ui_text,
+            &AppError::Domain(DomainError::User(NotFound)),
+        );
         bot.send_message(chat_id, text).await?;
         return Ok(());
     };
-    let view = views::build_referral_view(&state.ui_text, &state.bot_username, user.referral_code().inner());
+    let view = views::build_referral_view(
+        &state.ui_text,
+        &state.bot_username,
+        user.referral_code().inner(),
+    );
     render_view(&bot, &msg, view).await
 }
 

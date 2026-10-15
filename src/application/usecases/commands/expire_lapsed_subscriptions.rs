@@ -87,10 +87,10 @@ mod tests {
     use crate::domain::{
         DomainError, DomainResult,
         billing::Money,
+        device::{DeviceName, DeviceSetupCode},
         notification::Notifier,
         subscription::{
-            SubscriptionDevices, SubscriptionPlan, SubscriptionRepository,
-            SubscriptionStatus,
+            SubscriptionDevices, SubscriptionPlan, SubscriptionRepository, SubscriptionStatus,
         },
         user::{ReferralCode, SubscriptionToken, TelegramId, User, UserId, UserRepository},
         vpn::VpnAccessRevoker,
@@ -99,7 +99,6 @@ mod tests {
     use chrono::{DateTime, Days, Utc};
     use std::sync::{Arc, Mutex};
     use uuid::Uuid;
-
     // ==========================================
     // Моки
     // ==========================================
@@ -125,7 +124,10 @@ mod tests {
         ) -> DomainResult<Option<User>> {
             unreachable!("find_by_telegram_id() не используется в этом юзкейсе")
         }
-        async fn find_by_subscription_token(&self, _token: &SubscriptionToken) -> DomainResult<Option<User>> {
+        async fn find_by_subscription_token(
+            &self,
+            _token: &SubscriptionToken,
+        ) -> DomainResult<Option<User>> {
             unreachable!("find_by_subscription_token() не используется в этом юзкейсе")
         }
     }
@@ -200,8 +202,28 @@ mod tests {
         ) -> DomainResult<()> {
             unreachable!("notify_subscription_expiring() не используется в этом юзкейсе")
         }
-        async fn notify_balance_topped_up(&self, _user: &User, _amount: Money, _new_balance: Money) -> DomainResult<()> {
+        async fn notify_balance_topped_up(
+            &self,
+            _user: &User,
+            _amount: Money,
+            _new_balance: Money,
+        ) -> DomainResult<()> {
             unreachable!("notify_balance_topped_up() не используется в этом юзкейсе")
+        }
+        async fn notify_new_device_detected(
+            &self,
+            _user: &User,
+            _device_name: &DeviceName,
+        ) -> DomainResult<()> {
+            unreachable!("notify_new_device_detected() не используется в этом юзкейсе")
+        }
+        async fn notify_device_setup_code(
+            &self,
+            _user: &User,
+            _device_name: &DeviceName,
+            _code: &DeviceSetupCode,
+        ) -> DomainResult<()> {
+            unreachable!("notify_device_setup_code() не используется в этом юзкейсе")
         }
     }
 

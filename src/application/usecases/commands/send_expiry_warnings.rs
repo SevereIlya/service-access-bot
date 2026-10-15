@@ -81,6 +81,7 @@ mod tests {
     use crate::domain::{
         DomainError, DomainResult,
         billing::Money,
+        device::{DeviceName, DeviceSetupCode},
         notification::Notifier,
         subscription::{
             Subscription, SubscriptionDevices, SubscriptionPlan, SubscriptionRepository,
@@ -179,8 +180,28 @@ mod tests {
             }
             Ok(())
         }
-        async fn notify_balance_topped_up(&self, _user: &User, _amount: Money, _new_balance: Money) -> DomainResult<()> {
+        async fn notify_balance_topped_up(
+            &self,
+            _user: &User,
+            _amount: Money,
+            _new_balance: Money,
+        ) -> DomainResult<()> {
             unreachable!("notify_balance_topped_up() не используется в этом юзкейсе")
+        }
+        async fn notify_new_device_detected(
+            &self,
+            _user: &User,
+            _device_name: &DeviceName,
+        ) -> DomainResult<()> {
+            unreachable!("notify_new_device_detected() не используется в этом юзкейсе")
+        }
+        async fn notify_device_setup_code(
+            &self,
+            _user: &User,
+            _device_name: &DeviceName,
+            _code: &DeviceSetupCode,
+        ) -> DomainResult<()> {
+            unreachable!("notify_device_setup_code() не используется в этом юзкейсе")
         }
     }
 

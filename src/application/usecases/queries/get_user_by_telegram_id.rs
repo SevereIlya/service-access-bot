@@ -54,7 +54,10 @@ mod tests {
         ) -> DomainResult<Option<User>> {
             Ok(self.user_to_return.clone())
         }
-        async fn find_by_subscription_token(&self, _token: &SubscriptionToken) -> DomainResult<Option<User>> {
+        async fn find_by_subscription_token(
+            &self,
+            _token: &SubscriptionToken,
+        ) -> DomainResult<Option<User>> {
             unreachable!("find_by_subscription_token() не используется в этом юзкейсе")
         }
     }

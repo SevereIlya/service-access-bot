@@ -6,6 +6,7 @@ pub use queries::*;
 
 use crate::domain::{
     billing::{DynPaymentGateway, DynTransactionRepository, Money},
+    device::DynDeviceRepository,
     notification::DynNotifier,
     subscription::DynSubscriptionRepository,
     uow::DynUnitOfWork,
@@ -27,20 +28,27 @@ pub struct UseCases {
     pub request_top_up: Arc<RequestTopUpCommand>,
     pub process_payment_webhook: Arc<ProcessPaymentWebhookCommand>,
     pub purchase_tariff: Arc<PurchaseTariffCommand>,
+    pub register_device: Arc<RegisterDeviceCommand>,
 
     pub get_menu_state: Arc<GetMenuStateQuery>,
     pub get_profile: Arc<GetProfileQuery>,
     pub get_user_by_telegram_id: Arc<GetUserByTelegramIdQuery>,
     pub get_user_by_subscription_token: Arc<GetUserBySubscriptionTokenQuery>,
     pub get_purchase_quote: Arc<GetPurchaseQuoteQuery>,
+    pub get_stub_profile: Arc<GetStubProfileQuery>,
 }
 
 impl UseCases {
     #[rustfmt::skip]
-    #[allow(clippy::too_many_arguments)]
+    #[expect(
+        clippy::too_many_arguments,
+        clippy::too_many_lines,
+        reason = "composition root: линейная сборка зависимостей, дробить нечего"
+    )]
     pub fn new(
         user_repo: DynUserRepository,
         subscription_repo: DynSubscriptionRepository,
+        device_repo: DynDeviceRepository,
         node_repo: DynNodeRepository,
         vpn_connection_repo: DynVpnConnectionRepository,
         transaction_repo: DynTransactionRepository,
@@ -87,7 +95,7 @@ impl UseCases {
                 node_repo,
                 vpn_connection_repo,
                 vpn_provisioner,
-                config_generator,
+                config_generator.clone(),
             )
         );
         let request_top_up = Arc::new(
@@ -101,7 +109,7 @@ impl UseCases {
                 transaction_repo.clone(),
                 payment_gateway,
                 user_repo.clone(),
-                notifier,
+                notifier.clone(),
             )
         );
         let purchase_tariff = Arc::new(
@@ -109,8 +117,15 @@ impl UseCases {
                 uow
             )
         );
+        let register_device = Arc::new(
+            RegisterDeviceCommand::new(
+                subscription_repo.clone(),
+                device_repo,
+                notifier
+            )
+        );
 
-        // === Querys ===
+        // === Queries ===
         let get_user_by_telegram_id = Arc::new(
             GetUserByTelegramIdQuery::new(
                 user_repo.clone()
@@ -136,6 +151,11 @@ impl UseCases {
                 transaction_repo
             )
         );
+        let get_stub_profile = Arc::new(
+            GetStubProfileQuery::new(
+                config_generator,
+            )
+        );
 
         Self {
             register_user,
@@ -146,11 +166,13 @@ impl UseCases {
             request_top_up,
             process_payment_webhook,
             purchase_tariff,
+            register_device,
             get_menu_state,
             get_profile,
             get_user_by_telegram_id,
             get_user_by_subscription_token,
             get_purchase_quote,
+            get_stub_profile,
         }
     }
 }

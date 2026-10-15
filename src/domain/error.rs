@@ -1,4 +1,4 @@
-use crate::domain::billing::Money;
+use crate::domain::{billing::Money, device::DeviceStatus};
 use thiserror::Error;
 
 pub type DomainResult<T> = Result<T, DomainError>;
@@ -7,6 +7,9 @@ pub type DomainResult<T> = Result<T, DomainError>;
 pub enum DomainError {
     #[error(transparent)]
     Billing(#[from] BillingError),
+
+    #[error(transparent)]
+    Device(#[from] DeviceError),
 
     #[error(transparent)]
     Node(#[from] NodeError),
@@ -49,6 +52,21 @@ pub enum BillingError {
 
     #[error("Subscription plan is not purchasable: {0}")]
     PlanNotPurchasable(String),
+}
+
+#[derive(Error, Debug)]
+pub enum DeviceError {
+    #[error("Entity has no ID. It must be saved to the database first.")]
+    EntityNotSaved,
+
+    #[error("Invalid device status: {0}")]
+    InvalidStatus(String),
+
+    #[error("Invalid device status transition: {from} -> {to}")]
+    InvalidStatusTransition {
+        from: DeviceStatus,
+        to: DeviceStatus,
+    },
 }
 
 #[derive(Error, Debug)]

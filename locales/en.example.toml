@@ -3,7 +3,7 @@ msg_start_message = "Welcome"
 msg_trial_success_view = "Trial has been successfully issued {date}"
 msg_main_menu_view = "Main menu"
 msg_refresh_menu_view = "Main menu refreshed"
-msg_unknown_command = "️Send /start"
+msg_unknown_command = "Send /start"
 msg_subscription_expiring = "Your subscription expiring {date}"
 msg_subscription_expired = "Your subscription expired"
 msg_vpn_issued = "Your access {link}"
@@ -17,6 +17,17 @@ msg_purchase_insufficient = "Plan: <b>{plan}</b>\nDevises: <b>{devices}</b>\nTo 
 msg_top_up_link = "Bill <b>{amount}</b>"
 msg_purchase_success = "Plan <b>{plan}</b> for <b>{devices}</b> activated!\n\nValid until: <b>{date}</b>"
 msg_balance_topped_up = "Balance topped by <b>{amount}</b>.\n\nBalance: <b>{balance}</b>"
+msg_new_device_detected = "Device: {device}"
+msg_device_setup_code = "Device: {device}, Code: {code}"
+
+[stub]
+stub_no_subscription = "No subscription. Renew and refresh"
+stub_needs_hwid = "Enable X-HWID and refresh"
+stub_awaiting_setup = "Enter {code} in User Agent"
+stub_not_registered = "Invalid code. Copy it from the bot"
+stub_revoked = "Device disabled. Contact support"
+stub_unsupported_client = "Use Clash Verge or Clash Mi"
+stub_limit_exceeded = "Device limit: {current}/{limit}"
 
 [button]
 btn_menu_trial = "Use trial"

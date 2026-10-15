@@ -27,7 +27,10 @@ pub trait TransactionRepository: Send + Sync {
     /// Находит транзакцию по идентификатору у платёжного провайдера.
     ///
     /// Этот метод используется при обработке вебхука: провайдер присылает только свой `id`, а не наш `order_id`.
-    async fn find_by_provider_tx_id(&self, provider_tx_id: &str) -> DomainResult<Option<Transaction>>;
+    async fn find_by_provider_tx_id(
+        &self,
+        provider_tx_id: &str,
+    ) -> DomainResult<Option<Transaction>>;
 
     /// Возвращает текущий баланс пользователя.
     ///

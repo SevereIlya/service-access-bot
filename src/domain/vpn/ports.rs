@@ -27,5 +27,9 @@ pub trait VpnProvisioner: Send + Sync {
 }
 
 pub trait VpnConfigGenerator: Send + Sync {
+    /// Генерирует файл конфигурации
     fn generate(&self, nodes: &[&Node], user_uuid: Uuid) -> DomainResult<String>;
+
+    /// Генерирует файл-заглушку
+    fn generate_stub(&self, messages: &[String]) -> DomainResult<String>;
 }

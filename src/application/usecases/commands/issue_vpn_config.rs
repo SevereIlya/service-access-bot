@@ -216,6 +216,9 @@ mod tests {
             self.calls.lock().unwrap().push((names, user_uuid));
             Ok(self.output.clone())
         }
+        fn generate_stub(&self, _messages: &[String]) -> DomainResult<String> {
+            unreachable!("generate_stub() не используется в этом юзкейсе")
+        }
     }
 
     // ==========================================

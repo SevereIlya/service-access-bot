@@ -1,4 +1,4 @@
-use crate::adapters::telegram::{BotState, message_handler, callback_handler};
+use crate::adapters::telegram::{BotState, callback_handler, message_handler};
 use teloxide::prelude::*;
 use tracing::info;
 

@@ -13,7 +13,11 @@ pub async fn callback_handler(bot: Bot, qry: CallbackQuery, state: BotState) -> 
 }
 
 #[instrument(skip_all, fields(telegram_id = qry.from.id.0))]
-pub async fn callback_handler_inner(bot: Bot, qry: CallbackQuery, state: BotState) -> TelegramResult<()> {
+pub async fn callback_handler_inner(
+    bot: Bot,
+    qry: CallbackQuery,
+    state: BotState,
+) -> TelegramResult<()> {
     let Some(data) = qry.data.clone() else {
         return Ok(());
     };

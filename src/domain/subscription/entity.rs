@@ -168,7 +168,9 @@ impl Subscription {
         devices: SubscriptionDevices,
     ) -> DomainResult<()> {
         if !self.is_active() {
-            return Err(DomainError::Subscription(SubscriptionError::NoActiveSubscription));
+            return Err(DomainError::Subscription(
+                SubscriptionError::NoActiveSubscription,
+            ));
         }
         self.expires_at = self.expires_at + Days::new(plan.duration_days());
         self.plan = plan;
@@ -464,7 +466,10 @@ mod tests {
         );
         let old_expiry = sub.expires_at();
 
-        let result = sub.renew(SubscriptionPlan::Month3, SubscriptionDevices::new(5).unwrap());
+        let result = sub.renew(
+            SubscriptionPlan::Month3,
+            SubscriptionDevices::new(5).unwrap(),
+        );
 
         assert!(result.is_ok());
         assert_eq!(
@@ -492,7 +497,10 @@ mod tests {
             SubscriptionDevices::new(2).unwrap(),
         );
 
-        let result = sub.renew(SubscriptionPlan::Month1, SubscriptionDevices::new(2).unwrap());
+        let result = sub.renew(
+            SubscriptionPlan::Month1,
+            SubscriptionDevices::new(2).unwrap(),
+        );
 
         assert!(result.is_err());
         assert!(matches!(
@@ -513,7 +521,10 @@ mod tests {
             SubscriptionDevices::new(2).unwrap(),
         );
 
-        let result = sub.renew(SubscriptionPlan::Month1, SubscriptionDevices::new(2).unwrap());
+        let result = sub.renew(
+            SubscriptionPlan::Month1,
+            SubscriptionDevices::new(2).unwrap(),
+        );
 
         assert!(
             result.is_err(),

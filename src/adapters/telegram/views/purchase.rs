@@ -126,10 +126,7 @@ pub fn build_top_up_link_view(
     plan: SubscriptionPlan,
     devices: i32,
 ) -> MessageView {
-    let text = ui
-        .message
-        .msg_top_up_link
-        .replace("{amount}", &format_rub(shortfall));
+    let text = ui.message.msg_top_up_link.replace("{amount}", &format_rub(shortfall));
     let keyboard = InlineKeyboardMarkup::new(vec![
         vec![InlineKeyboardButton::url(
             ui.button.btn_open_payment.clone(),

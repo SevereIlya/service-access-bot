@@ -8,12 +8,12 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 use tracing::instrument;
 
+#[must_use]
 pub struct SqlxNodeRepository {
     executor: SqlxExecutor,
 }
 
 impl SqlxNodeRepository {
-    #[must_use]
     pub const fn new(pool: PgPool) -> Self {
         Self {
             executor: SqlxExecutor::Pool(pool),

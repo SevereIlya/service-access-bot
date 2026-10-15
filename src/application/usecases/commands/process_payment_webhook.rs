@@ -30,10 +30,15 @@ impl ProcessPaymentWebhookCommand {
     }
 
     pub async fn execute(&self, provider_tx_id: &str) -> AppResult<()> {
-        let state: ProviderTransactionState = self.payment_gateway.get_status(provider_tx_id).await?;
+        let state: ProviderTransactionState =
+            self.payment_gateway.get_status(provider_tx_id).await?;
 
-        let Some(mut tx) = self.transaction_repo.find_by_provider_tx_id(provider_tx_id).await? else {
-            warn!(provider_tx_id, "Вебхук по неизвестной транзакции провайдера");
+        let Some(mut tx) = self.transaction_repo.find_by_provider_tx_id(provider_tx_id).await?
+        else {
+            warn!(
+                provider_tx_id,
+                "Вебхук по неизвестной транзакции провайдера"
+            );
             return Ok(());
         };
 
@@ -86,7 +91,10 @@ impl ProcessPaymentWebhookCommand {
 
         match state.status {
             ProviderTxStatus::Pending => {
-                info!(order_id = tx.order_id(), "Провайдер всё ещё считает платёж висящим");
+                info!(
+                    order_id = tx.order_id(),
+                    "Провайдер всё ещё считает платёж висящим"
+                );
                 return Ok(());
             }
             ProviderTxStatus::Confirmed => {
@@ -155,6 +163,7 @@ mod tests {
             Money, PaymentGateway, PaymentInvoice, PaymentProvider, Transaction, TransactionId,
             TransactionKind, TransactionRepository,
         },
+        device::{DeviceName, DeviceSetupCode},
         notification::Notifier,
         user::{ReferralCode, SubscriptionToken, TelegramId, User, UserId, UserRepository},
     };
@@ -272,6 +281,21 @@ mod tests {
         ) -> DomainResult<()> {
             self.notified.lock().unwrap().push((amount, new_balance));
             Ok(())
+        }
+        async fn notify_new_device_detected(
+            &self,
+            _user: &User,
+            _device_name: &DeviceName,
+        ) -> DomainResult<()> {
+            unreachable!("notify_new_device_detected() не используется в этом юзкейсе")
+        }
+        async fn notify_device_setup_code(
+            &self,
+            _user: &User,
+            _device_name: &DeviceName,
+            _code: &DeviceSetupCode,
+        ) -> DomainResult<()> {
+            unreachable!("notify_device_setup_code() не используется в этом юзкейсе")
         }
     }
 

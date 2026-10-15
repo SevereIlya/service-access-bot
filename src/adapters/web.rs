@@ -1,3 +1,4 @@
+use crate::adapters::StubText;
 use crate::application::UseCases;
 use crate::infrastructure::AppConfig;
 use std::sync::Arc;
@@ -14,4 +15,5 @@ pub use router::*;
 pub struct WebState {
     pub usecases: Arc<UseCases>,
     pub config: Arc<AppConfig>,
+    pub stub_text: Arc<StubText>,
 }

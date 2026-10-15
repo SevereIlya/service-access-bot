@@ -115,7 +115,9 @@ impl PaymentGateway for PlategaGateway {
             .json(&body)
             .send()
             .await
-            .map_err(|e| DomainError::SystemFailure(format!("Platega: HTTP-ошибка создания счёта: {e}")))?;
+            .map_err(|e| {
+                DomainError::SystemFailure(format!("Platega: HTTP-ошибка создания счёта: {e}"))
+            })?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -125,10 +127,9 @@ impl PaymentGateway for PlategaGateway {
             )));
         }
 
-        let parsed: CreateInvoiceResponseV2 = response
-            .json()
-            .await
-            .map_err(|e| DomainError::SystemFailure(format!("Platega: не удалось распарсить ответ: {e}")))?;
+        let parsed: CreateInvoiceResponseV2 = response.json().await.map_err(|e| {
+            DomainError::SystemFailure(format!("Platega: не удалось распарсить ответ: {e}"))
+        })?;
 
         Ok(PaymentInvoice {
             payment_url: parsed.url,
@@ -145,7 +146,9 @@ impl PaymentGateway for PlategaGateway {
             .header("X-Secret", &self.config.secret)
             .send()
             .await
-            .map_err(|e| DomainError::SystemFailure(format!("Platega: HTTP-ошибка запроса статуса: {e}")))?;
+            .map_err(|e| {
+                DomainError::SystemFailure(format!("Platega: HTTP-ошибка запроса статуса: {e}"))
+            })?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -160,8 +163,9 @@ impl PaymentGateway for PlategaGateway {
             .await
             .map_err(|e| DomainError::SystemFailure(format!("Platega: статус - не JSON: {e}")))?;
 
-        let parsed: TransactionStatusDto = serde_json::from_value(raw.clone())
-            .map_err(|e| DomainError::SystemFailure(format!("Platega: неожиданная форма ответа статуса: {e}")))?;
+        let parsed: TransactionStatusDto = serde_json::from_value(raw.clone()).map_err(|e| {
+            DomainError::SystemFailure(format!("Platega: неожиданная форма ответа статуса: {e}"))
+        })?;
 
         Ok(ProviderTransactionState {
             status: parsed.status.into(),

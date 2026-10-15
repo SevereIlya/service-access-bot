@@ -32,6 +32,22 @@ pub struct SubscriptionRow {
 }
 
 #[derive(Debug, FromRow)]
+pub struct DeviceRow {
+    pub id: i64,
+    pub user_id: i64,
+    pub fingerprint: String,
+    pub name: String,
+    pub status: String,
+    pub hardware_id: Option<String>,
+    pub os_name: Option<String>,
+    pub os_version: Option<String>,
+    pub device_model: Option<String>,
+    pub user_agent: Option<String>,
+    pub first_seen_at: DateTime<Utc>,
+    pub last_seen_at: DateTime<Utc>,
+}
+
+#[derive(Debug, FromRow)]
 pub struct NodeRow {
     pub id: i64,
     pub name: String,

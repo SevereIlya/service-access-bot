@@ -26,6 +26,7 @@ pub async fn message_handler_inner(bot: Bot, msg: Message, state: BotState) -> T
         return command::handle_commands(bot, msg, state, user_opt, cmd).await;
     }
 
-    bot.send_message(chat_id, state.ui_text.message.msg_unknown_command.clone()).await?;
+    bot.send_message(chat_id, state.ui_text.message.msg_unknown_command.clone())
+        .await?;
     Ok(())
 }

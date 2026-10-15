@@ -9,12 +9,12 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 use tracing::instrument;
 
+#[must_use]
 pub struct SqlxTransactionRepository {
     executor: SqlxExecutor,
 }
 
 impl SqlxTransactionRepository {
-    #[must_use]
     pub const fn new(pool: PgPool) -> Self {
         Self {
             executor: SqlxExecutor::Pool(pool),
@@ -91,7 +91,10 @@ impl TransactionRepository for SqlxTransactionRepository {
     }
 
     #[instrument(skip(self))]
-    async fn find_by_provider_tx_id(&self, provider_tx_id: &str) -> DomainResult<Option<Transaction>> {
+    async fn find_by_provider_tx_id(
+        &self,
+        provider_tx_id: &str,
+    ) -> DomainResult<Option<Transaction>> {
         let query = sqlx::query_as!(
             TransactionRow,
             r#"

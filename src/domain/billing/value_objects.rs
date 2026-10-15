@@ -220,9 +220,21 @@ mod tests {
 
     #[test]
     fn test_ceil_to_rubles_rounds_up_to_whole_ruble() {
-        assert_eq!(Money::new(26_673).unwrap().ceil_to_rubles().inner(), 26_700, "266.73 -> 267.00");
-        assert_eq!(Money::new(26_700).unwrap().ceil_to_rubles().inner(), 26_700, "уже целое - не трогаем");
+        assert_eq!(
+            Money::new(26_673).unwrap().ceil_to_rubles().inner(),
+            26_700,
+            "266.73 -> 267.00"
+        );
+        assert_eq!(
+            Money::new(26_700).unwrap().ceil_to_rubles().inner(),
+            26_700,
+            "уже целое - не трогаем"
+        );
         assert_eq!(Money::new(0).unwrap().ceil_to_rubles().inner(), 0);
-        assert_eq!(Money::new(1).unwrap().ceil_to_rubles().inner(), 100, "1 копейка всё равно округляется до целого рубля");
+        assert_eq!(
+            Money::new(1).unwrap().ceil_to_rubles().inner(),
+            100,
+            "1 копейка всё равно округляется до целого рубля"
+        );
     }
 }
