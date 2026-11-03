@@ -1,6 +1,7 @@
 use crate::domain::{
     DomainResult,
     billing::DynTransactionRepository,
+    referral::DynReferralRepository,
     subscription::DynSubscriptionRepository,
     user::DynUserRepository,
     vpn::{DynNodeRepository, DynVpnConnectionRepository},
@@ -22,6 +23,7 @@ pub trait UowContext: Send + Sync {
     fn nodes(&self) -> DynNodeRepository;
     fn vpn_connections(&self) -> DynVpnConnectionRepository;
     fn transactions(&self) -> DynTransactionRepository;
+    fn referrals(&self) -> DynReferralRepository;
 
     async fn commit(&mut self) -> DomainResult<()>;
     async fn rollback(&mut self) -> DomainResult<()>;

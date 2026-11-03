@@ -1,6 +1,6 @@
 use crate::domain::{
     DomainResult,
-    billing::{Money, Transaction, TransactionId},
+    billing::{Money, Transaction, TransactionId, TransactionKind},
     user::UserId,
 };
 use async_trait::async_trait;
@@ -39,4 +39,11 @@ pub trait TransactionRepository: Send + Sync {
     ///
     /// Вне транзакции (pool) блокировка живёт только на время метода.
     async fn balance_for_user(&self, user_id: UserId) -> DomainResult<Money>;
+
+    /// Возвращает общую сумму успешных транзакций пользователя указанного типа.
+    async fn sum_for_user_by_kind(
+        &self,
+        user_id: UserId,
+        kind: TransactionKind,
+    ) -> DomainResult<Money>;
 }

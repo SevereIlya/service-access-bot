@@ -1,8 +1,9 @@
 use crate::adapters::telegram::{BotState, Command, TelegramResult, message_error, views};
-use crate::domain::user::User;
+use crate::application::{AppliedReferral, Registration};
+use crate::domain::user::{ReferralCode, User};
 use teloxide::prelude::*;
 use teloxide::types::ParseMode::Html;
-use tracing::error;
+use tracing::{error, info};
 
 pub async fn handle_commands(
     bot: Bot,
@@ -15,7 +16,7 @@ pub async fn handle_commands(
     let telegram_id = chat_id.0;
 
     match cmd {
-        Command::Start(_payload) => {
+        Command::Start(payload) => {
             let username: Option<String> = msg.chat.username().map(ToString::to_string);
             let full_name: String = [msg.chat.first_name(), msg.chat.last_name()]
                 .into_iter()
@@ -24,8 +25,10 @@ pub async fn handle_commands(
                 .join(" ");
 
             match state.usecases.register_user.execute(telegram_id, username, full_name).await {
-                Ok(user) => {
-                    // TODO: Тут будет проверка рефералки try_process_referral
+                Ok(registration) => {
+                    let applied =
+                        try_apply_referral(&state, &registration, telegram_id, &payload).await;
+                    let user = registration.into_user();
 
                     let menu_state = state.usecases.get_menu_state.execute(&user).await?;
                     let view = views::build_start_message(&state.ui_text, menu_state.can_trial);
@@ -33,6 +36,17 @@ pub async fn handle_commands(
                         .parse_mode(Html)
                         .reply_markup(view.keyboard)
                         .await?;
+
+                    if let Some(applied) = applied {
+                        let view = views::build_referral_welcome_message(
+                            &state.ui_text,
+                            applied.welcome_bonus,
+                        );
+                        bot.send_message(chat_id, view.text)
+                            .parse_mode(Html)
+                            .reply_markup(view.keyboard)
+                            .await?;
+                    }
                 }
                 Err(e) => {
                     error!(error = ?e, "Ошибка при обработке /start");
@@ -59,4 +73,43 @@ pub async fn handle_commands(
         }
     }
     Ok(())
+}
+
+fn parse_referral_payload(payload: &str) -> Option<ReferralCode> {
+    let payload = payload.trim();
+    if payload.is_empty() {
+        return None;
+    }
+    match ReferralCode::parse(payload) {
+        Ok(code) => Some(code),
+        Err(e) => {
+            info!(
+                error = ?e,
+                payload_len = payload.len(),
+                "Невалидный payload в /start, реферальный код проигнорирован"
+            );
+            None
+        }
+    }
+}
+
+async fn try_apply_referral(
+    state: &BotState,
+    registration: &Registration,
+    telegram_id: i64,
+    payload: &str,
+) -> Option<AppliedReferral> {
+    let code = parse_referral_payload(payload)?;
+    match state.usecases.apply_referral.execute(registration, &code).await {
+        Ok(applied) => applied,
+        Err(e) => {
+            error!(
+                error = ?e,
+                telegram_id,
+                referral_code = code.inner(),
+                "Не удалось применить реферальный код при /start: юзер остался без бонуса"
+            );
+            None
+        }
+    }
 }

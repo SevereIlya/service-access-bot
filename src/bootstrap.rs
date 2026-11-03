@@ -4,10 +4,12 @@ use crate::adapters::{
     web::WebState,
 };
 use crate::application::UseCases;
+use crate::domain::referral::DynReferralRepository;
 use crate::domain::{
     billing::{DynPaymentGateway, DynTransactionRepository, Money},
     device::DynDeviceRepository,
     notification::DynNotifier,
+    referral::{CashbackPercent, ReferralPolicy},
     subscription::DynSubscriptionRepository,
     uow::DynUnitOfWork,
     user::DynUserRepository,
@@ -18,8 +20,8 @@ use crate::domain::{
 };
 use crate::infrastructure::{
     AppConfig, ClashConfigGenerator, PlategaGateway, SqlxDeviceRepository, SqlxNodeRepository,
-    SqlxSubscriptionRepository, SqlxTransactionRepository, SqlxUnitOfWork, SqlxUserRepository,
-    SqlxVpnConnectionRepository, XuiAccessRevoker, XuiProvisioner,
+    SqlxReferralRepository, SqlxSubscriptionRepository, SqlxTransactionRepository, SqlxUnitOfWork,
+    SqlxUserRepository, SqlxVpnConnectionRepository, XuiAccessRevoker, XuiProvisioner,
 };
 use std::sync::Arc;
 use teloxide::prelude::*;
@@ -53,6 +55,11 @@ impl AppState {
         let pool = crate::infrastructure::postgres::create_pg_pool(&config.general.database_url).await?;
         info!("Подключение к БД установлено");
 
+        crate::infrastructure::postgres::run_migrations(&pool).await.map_err(|e| {
+            anyhow::anyhow!("Не удалось накатить миграции: {e}")
+        })?;
+        info!("Миграции БД актуальны");
+
         let user_repo: DynUserRepository = Arc::new(
             SqlxUserRepository::new(pool.clone())
         );
@@ -70,6 +77,9 @@ impl AppState {
         );
         let transaction_repo: DynTransactionRepository = Arc::new(
             SqlxTransactionRepository::new(pool.clone())
+        );
+        let referral_repo: DynReferralRepository = Arc::new(
+            SqlxReferralRepository::new(pool.clone())
         );
         let uow: DynUnitOfWork = Arc::new(
             SqlxUnitOfWork::new(pool)
@@ -113,6 +123,16 @@ impl AppState {
         );
         info!("PlategaGateway инициализирован");
 
+        let referral_policy = ReferralPolicy::new(
+            Money::new(config.referral.welcome_bonus)?,
+            CashbackPercent::new(config.referral.cashback_percent)?,
+        );
+        info!(
+            welcome_bonus_kopecks = referral_policy.welcome_bonus().inner(),
+            cashback_percent = referral_policy.cashback_percent().inner(),
+            "Реферальная программа сконфигурирована"
+        );
+
         debug!("Инициализация юзкейсов приложения");
         let usecases = Arc::new(UseCases::new(
             user_repo,
@@ -121,6 +141,7 @@ impl AppState {
             node_repo,
             vpn_connection_repo,
             transaction_repo,
+            referral_repo,
             uow,
             vpn_revoker,
             vpn_provisioner,
@@ -129,6 +150,7 @@ impl AppState {
             notifier,
             config.general.uuid_namespace,
             Money::new(config.payments.base_price)?,
+            referral_policy,
         ));
 
         let bot_state = BotState {

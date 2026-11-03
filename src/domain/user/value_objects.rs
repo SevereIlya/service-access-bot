@@ -1,6 +1,6 @@
 use crate::domain::{DomainError, DomainResult, UserError};
 use std::fmt::{Display, Formatter};
-use std::str::FromStr;
+use strum::{EnumString, IntoStaticStr, VariantArray};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -49,6 +49,8 @@ impl Display for TelegramId {
 pub struct ReferralCode(String);
 
 impl ReferralCode {
+    const MAX_LEN: usize = 64;
+
     #[must_use]
     pub const fn new(code: String) -> Self {
         Self(code)
@@ -62,6 +64,24 @@ impl ReferralCode {
         let short_id = uuid.as_u128() as u64;
 
         Self(base62::encode(short_id))
+    }
+
+    /// Разбирает код из payload `/start`
+    ///
+    /// Доступны только `A-Z a-z 0-9 _ -`, длина `1..=64`
+    ///
+    /// # Errors
+    /// [`UserError::InvalidReferralCode`], если ввод пуст, слишком длинный или содержит посторонние символы.
+    pub fn parse(raw: &str) -> DomainResult<Self> {
+        let is_valid = (1..=Self::MAX_LEN).contains(&raw.len())
+            && raw
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'));
+        if is_valid {
+            Ok(Self(raw.to_owned()))
+        } else {
+            Err(UserError::InvalidReferralCode.into())
+        }
     }
 
     #[must_use]
@@ -90,6 +110,15 @@ impl SubscriptionToken {
     }
 }
 
+/// Информация о пользователе другому пользователю.
+/// Намеренно без `telegram_id`.
+/// `Username` хранится без `@`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PublicIdentity {
+    Username(String),
+    Name(String),
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct DiscountPercent(u8);
 
@@ -113,38 +142,28 @@ impl DiscountPercent {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, strum::Display, EnumString, IntoStaticStr, VariantArray,
+)]
+#[strum(
+    serialize_all = "snake_case",
+    parse_err_ty = DomainError,
+    parse_err_fn = UserRole::parse_err,
+)]
 pub enum UserRole {
     User,
     Admin,
 }
 
 impl UserRole {
-    #[must_use]
-    pub const fn as_str(&self) -> &'static str {
-        match self {
-            Self::User => "user",
-            Self::Admin => "admin",
-        }
-    }
-}
-
-impl FromStr for UserRole {
-    type Err = DomainError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "user" => Ok(Self::User),
-            "admin" => Ok(Self::Admin),
-            _ => Err(UserError::InvalidRole(s.to_string()).into()),
-        }
+    fn parse_err(value: &str) -> DomainError {
+        UserError::InvalidRole(value.to_owned()).into()
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::str::FromStr;
 
     // --- UserId ---
     #[test]
@@ -159,7 +178,7 @@ mod tests {
     // --- TelegramId ---
     #[test]
     fn test_telegram_id() {
-        let tg_val = 123456789;
+        let tg_val = 123_456_789;
         let tg_id = TelegramId::new(tg_val);
 
         assert_eq!(tg_id.inner(), tg_val);
@@ -170,7 +189,7 @@ mod tests {
     #[test]
     fn test_referral_code() {
         let code_str = "PuCkAQB68".to_string();
-        let ref_code = ReferralCode::new(code_str.clone());
+        let ref_code = ReferralCode::new(code_str);
 
         assert_eq!(ref_code.inner(), "PuCkAQB68");
 
@@ -187,11 +206,49 @@ mod tests {
         );
     }
 
+    #[test]
+    fn test_referral_code_parse_accepts_generated_codes() {
+        for _ in 0..100 {
+            let generated = ReferralCode::generate();
+            assert_eq!(ReferralCode::parse(generated.inner()).unwrap(), generated);
+        }
+    }
+
+    #[test]
+    fn test_referral_code_parse_accepts_telegram_charset_and_max_len() {
+        assert!(ReferralCode::parse("aZ09_-").is_ok());
+        assert!(ReferralCode::parse(&"a".repeat(64)).is_ok());
+    }
+
+    #[test]
+    fn test_referral_code_parse_rejects_garbage() {
+        let too_long = "a".repeat(65);
+        let cases = [
+            "",
+            too_long.as_str(),
+            "has space",
+            "semi;colon",
+            "quote'",
+            "кириллица",
+            "emoji🎁",
+            "line\nbreak",
+            "%20",
+        ];
+
+        for bad in cases {
+            let err = ReferralCode::parse(bad).unwrap_err();
+            assert!(
+                matches!(err, DomainError::User(UserError::InvalidReferralCode)),
+                "{bad:?} должен быть отклонён"
+            );
+        }
+    }
+
     // --- SubscriptionToken ---
     #[test]
     fn test_subscription_token() {
         let token_str = "0Md8B21SMCKX".to_string();
-        let token = SubscriptionToken::new(token_str.clone());
+        let token = SubscriptionToken::new(token_str);
 
         assert_eq!(token.inner(), "0Md8B21SMCKX");
 
@@ -242,27 +299,31 @@ mod tests {
 
     // --- UserRole ---
     #[test]
-    fn test_user_role_as_str() {
-        assert_eq!(UserRole::User.as_str(), "user");
-        assert_eq!(UserRole::Admin.as_str(), "admin");
+    fn test_role_str_roundtrip() {
+        for &role in UserRole::VARIANTS {
+            let s: &'static str = role.into();
+            let parsed: UserRole = s.parse().unwrap();
+            assert_eq!(parsed, role);
+        }
     }
 
     #[test]
-    fn test_user_role_from_str_valid() {
-        assert_eq!(UserRole::from_str("user").unwrap(), UserRole::User);
-        assert_eq!(UserRole::from_str("admin").unwrap(), UserRole::Admin);
+    fn test_role_unknown_rejected() {
+        let bad = "superadmin";
+        let result: Result<UserRole, DomainError> = bad.parse();
+        assert!(matches!(
+            result.unwrap_err(),
+            DomainError::User(UserError::InvalidRole(s)) if s == bad
+        ));
     }
 
     #[test]
-    fn test_user_role_from_str_invalid() {
-        let result = UserRole::from_str("superuser");
-        assert!(result.is_err());
+    fn test_role_pinned_names() {
+        let pinned = [(UserRole::User, "user"), (UserRole::Admin, "admin")];
 
-        match result.unwrap_err() {
-            DomainError::User(UserError::InvalidRole(role)) => {
-                assert_eq!(role, "superuser")
-            }
-            _ => panic!("Ожидалась ошибка UserError::InvalidRole"),
+        assert_eq!(pinned.len(), UserRole::VARIANTS.len());
+        for (role, expected) in pinned {
+            assert_eq!(<&'static str>::from(role), expected);
         }
     }
 }

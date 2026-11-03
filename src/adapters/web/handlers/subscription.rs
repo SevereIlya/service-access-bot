@@ -124,8 +124,11 @@ fn device_signal(headers: &HeaderMap) -> DeviceSignal {
 /// `None` - заголовок отсутствует или пуст.
 fn header_text(headers: &HeaderMap, key: &str, max_chars: usize) -> Option<String> {
     let value = headers.get(key)?;
-    let text: String =
-        String::from_utf8_lossy(value.as_bytes()).trim().chars().take(max_chars).collect();
+    let text: String = String::from_utf8_lossy(value.as_bytes())
+        .trim()
+        .chars()
+        .take(max_chars)
+        .collect();
     (!text.is_empty()).then_some(text)
 }
 
@@ -155,12 +158,18 @@ mod tests {
 
     #[test]
     fn granted_serves_the_working_config() {
-        assert_eq!(reply_for(&DeviceAccess::Granted, &texts()), ProfileReply::Config);
+        assert_eq!(
+            reply_for(&DeviceAccess::Granted, &texts()),
+            ProfileReply::Config
+        );
     }
 
     #[test]
     fn rejected_client_gets_no_stub_at_all() {
-        assert_eq!(reply_for(&DeviceAccess::RejectedClient, &texts()), ProfileReply::Reject);
+        assert_eq!(
+            reply_for(&DeviceAccess::RejectedClient, &texts()),
+            ProfileReply::Reject
+        );
     }
 
     #[test]
@@ -172,12 +181,25 @@ mod tests {
             (DeviceAccess::NotRegistered, "not-registered".to_owned()),
             (DeviceAccess::Revoked, "revoked".to_owned()),
             (DeviceAccess::UnsupportedClient, "unsupported".to_owned()),
-            (DeviceAccess::AwaitingSetup { code }, format!("setup {CODE}")),
-            (DeviceAccess::LimitExceeded { limit: 3, current: 3 }, "limit 3/3".to_owned()),
+            (
+                DeviceAccess::AwaitingSetup { code },
+                format!("setup {CODE}"),
+            ),
+            (
+                DeviceAccess::LimitExceeded {
+                    limit: 3,
+                    current: 3,
+                },
+                "limit 3/3".to_owned(),
+            ),
         ];
 
         for (access, expected) in cases {
-            assert_eq!(reply_for(&access, &texts()), ProfileReply::Stub(expected), "{access:?}");
+            assert_eq!(
+                reply_for(&access, &texts()),
+                ProfileReply::Stub(expected),
+                "{access:?}"
+            );
         }
     }
 
@@ -219,7 +241,10 @@ mod tests {
             Some("Пиксель 8")
         );
 
-        headers.insert("x-device-model", HeaderValue::from_bytes(b"\xff\xfe").unwrap());
+        headers.insert(
+            "x-device-model",
+            HeaderValue::from_bytes(b"\xff\xfe").unwrap(),
+        );
         assert!(
             header_text(&headers, "x-device-model", 64).is_some(),
             "мусорные байты не должны ронять разбор"

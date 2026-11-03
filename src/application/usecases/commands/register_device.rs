@@ -122,7 +122,11 @@ impl RegisterDeviceCommand {
             devices: self.device_repo.find_all_by_user(user_id).await?,
             now: Utc::now(),
         };
-        
+
+        // Известные пределы:
+        // - два одновременных запроса с одним новым fingerprint: второй INSERT упрётся
+        //   в UNIQUE (user_id, fingerprint) и вернёт SystemFailure, повтор клиента отработает;
+        // - два разных новых устройства одновременно могут превысить лимит на единицу.
         match identity {
             DeviceIdentity::Hwid(hwid) => self.on_hwid(&mut registry, &hwid, signal).await,
             DeviceIdentity::IssuedCode(code) => self.on_issued_code(&mut registry, &code).await,
@@ -276,7 +280,7 @@ mod tests {
         subscription::{
             Subscription, SubscriptionPlan, SubscriptionRepository, SubscriptionStatus,
         },
-        user::{ReferralCode, SubscriptionToken, TelegramId},
+        user::{PublicIdentity, ReferralCode, SubscriptionToken, TelegramId},
     };
     use async_trait::async_trait;
     use chrono::Days;
@@ -436,6 +440,21 @@ mod tests {
             self.spy.setup_code_notices.lock().unwrap().push(code.clone());
             self.outcome()
         }
+        async fn notify_referral_joined(
+            &self,
+            _referrer: &User,
+            _friend: Option<PublicIdentity>,
+        ) -> DomainResult<()> {
+            unreachable!("notify_referral_joined() не используется в этом юзкейсе")
+        }
+        async fn notify_referral_cashback(
+            &self,
+            _referrer: &User,
+            _friend: Option<PublicIdentity>,
+            _amount: Money,
+        ) -> DomainResult<()> {
+            unreachable!("notify_referral_cashback() не используется в этом юзкейсе")
+        }
     }
 
     // ==========================================
@@ -561,8 +580,13 @@ mod tests {
     async fn no_active_subscription_skips_device_check() {
         let (cmd, spy) = setup(None, vec![], false);
 
-        let access =
-            cmd.execute(&make_user(1), make_signal(Some("hw-1"), None, Some(CLASHMI_UA))).await.unwrap();
+        let access = cmd
+            .execute(
+                &make_user(1),
+                make_signal(Some("hw-1"), None, Some(CLASHMI_UA)),
+            )
+            .await
+            .unwrap();
 
         assert_eq!(access, DeviceAccess::NoActiveSubscription);
         spy.assert_untouched();
@@ -883,7 +907,10 @@ mod tests {
         let (cmd, spy) = setup(Some(3), vec![], false);
 
         let access = cmd
-            .execute(&make_user(1), make_signal(None, None, Some(CLASHMETA_ANDROID_UA)))
+            .execute(
+                &make_user(1),
+                make_signal(None, None, Some(CLASHMETA_ANDROID_UA)),
+            )
             .await
             .unwrap();
 
@@ -922,7 +949,11 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(access, DeviceAccess::RejectedClient, "а не NoActiveSubscription");
+        assert_eq!(
+            access,
+            DeviceAccess::RejectedClient,
+            "а не NoActiveSubscription"
+        );
         spy.assert_untouched();
     }
 

@@ -29,7 +29,7 @@ impl RequestTopUpCommand {
     pub async fn execute(&self, user: &User, amount: Money) -> AppResult<String> {
         let user_id = user.id().ok_or(DomainError::User(UserError::EntityNotSaved))?;
         let kind = TransactionKind::TopUp;
-        let order_id = format!("{}_{user_id}_{}", kind.as_str(), Uuid::new_v4().simple());
+        let order_id = format!("{kind}_{user_id}_{}", Uuid::new_v4().simple());
 
         let mut tx = Transaction::new(
             user_id,
@@ -102,7 +102,7 @@ mod tests {
     // ==========================================
 
     struct MockPaymentGateway {
-        /// None = create_invoice падает.
+        /// None = `create_invoice` падает.
         invoice: Option<PaymentInvoice>,
     }
 
@@ -114,12 +114,9 @@ mod tests {
             _amount: Money,
             _payer_id: &User,
         ) -> DomainResult<PaymentInvoice> {
-            match &self.invoice {
-                Some(invoice) => Ok(invoice.clone()),
-                None => Err(DomainError::SystemFailure(
-                    "Platega недоступен (тест)".into(),
-                )),
-            }
+            self.invoice
+                .clone()
+                .ok_or_else(|| DomainError::SystemFailure("Platega недоступен (тест)".into()))
         }
 
         async fn get_status(
@@ -154,6 +151,13 @@ mod tests {
         }
         async fn balance_for_user(&self, _user_id: UserId) -> DomainResult<Money> {
             unreachable!("balance_for_user() не используется в этом юзкейсе")
+        }
+        async fn sum_for_user_by_kind(
+            &self,
+            _user_id: UserId,
+            _kind: TransactionKind,
+        ) -> DomainResult<Money> {
+            unreachable!("sum_for_user_by_kind() не используется в этом юзкейсе")
         }
     }
 

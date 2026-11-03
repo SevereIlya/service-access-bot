@@ -1,6 +1,6 @@
 use crate::domain::{
     DomainResult,
-    user::{SubscriptionToken, TelegramId, User, UserId},
+    user::{ReferralCode, SubscriptionToken, TelegramId, User, UserId},
 };
 use async_trait::async_trait;
 use std::sync::Arc;
@@ -17,4 +17,5 @@ pub trait UserRepository: Send + Sync {
         &self,
         token: &SubscriptionToken,
     ) -> DomainResult<Option<User>>;
+    async fn find_by_referral_code(&self, code: &ReferralCode) -> DomainResult<Option<User>>;
 }

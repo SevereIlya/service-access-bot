@@ -78,3 +78,11 @@ pub struct TransactionRow {
     pub payload: Option<serde_json::Value>,
     pub created_at: DateTime<Utc>,
 }
+
+#[derive(Debug, FromRow)]
+pub struct ReferralRow {
+    pub id: i64,
+    pub referrer_id: i64,
+    pub referred_id: i64,
+    pub created_at: DateTime<Utc>,
+}

@@ -1,6 +1,6 @@
 use crate::domain::{
     DomainError, DomainResult, UserError,
-    user::{SubscriptionToken, TelegramId, User, UserId, UserRepository},
+    user::{ReferralCode, SubscriptionToken, TelegramId, User, UserId, UserRepository},
 };
 use crate::exec_query;
 use crate::infrastructure::{SharedTransaction, SqlxExecutor, UserRow};
@@ -45,7 +45,7 @@ impl UserRepository for SqlxUserRepository {
             user.telegram_id().inner(),
             user.username(),
             user.full_name(),
-            user.role().as_str(),
+            <&'static str>::from(user.role()),
             user.frozen_base_price().inner(),
             user.referral_code().inner(),
             user.subscription_token().inner(),
@@ -90,7 +90,7 @@ impl UserRepository for SqlxUserRepository {
                 full_name = $6
             WHERE id = $7
             "#,
-            user.role().as_str(),
+            <&'static str>::from(user.role()),
             user.frozen_base_price().inner(),
             user.trial_used(),
             i32::from(user.discount_percent().inner()),
@@ -151,6 +151,23 @@ impl UserRepository for SqlxUserRepository {
             WHERE subscription_token = $1
             "#,
             token.inner()
+        );
+
+        let row: Option<UserRow> = exec_query!(self.executor, query, fetch_optional)
+            .map_err(|e| DomainError::SystemFailure(e.to_string()))?;
+        row.map(TryInto::try_into).transpose()
+    }
+
+    #[instrument(skip(self))]
+    async fn find_by_referral_code(&self, code: &ReferralCode) -> DomainResult<Option<User>> {
+        let query = sqlx::query_as!(
+            UserRow,
+            r#"
+            SELECT *
+            FROM users
+            WHERE referral_code = $1
+            "#,
+            code.inner()
         );
 
         let row: Option<UserRow> = exec_query!(self.executor, query, fetch_optional)

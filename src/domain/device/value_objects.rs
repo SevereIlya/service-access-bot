@@ -658,7 +658,13 @@ mod tests {
             DeviceIdentity::Hwid("hw-1".into())
         );
         assert_eq!(
-            signal(Some("hw-1"), None, None, Some("ClashMetaForAndroid/2.11.32.Meta")).identity(),
+            signal(
+                Some("hw-1"),
+                None,
+                None,
+                Some("ClashMetaForAndroid/2.11.32.Meta")
+            )
+            .identity(),
             DeviceIdentity::Unconfigured(AppClient::ClashMeta)
         );
         assert_eq!(
@@ -681,7 +687,10 @@ mod tests {
                 "{ua}"
             );
         }
-        assert_eq!(signal(Some("hw-1"), None, None, None).identity(), DeviceIdentity::Unknown);
+        assert_eq!(
+            signal(Some("hw-1"), None, None, None).identity(),
+            DeviceIdentity::Unknown
+        );
     }
 
     #[test]
@@ -696,8 +705,14 @@ mod tests {
                 "{ua}"
             );
         }
-        assert_eq!(signal(None, None, None, Some("my custom ua")).identity(), DeviceIdentity::Unknown);
-        assert_eq!(signal(None, None, None, Some("   ")).identity(), DeviceIdentity::Unknown);
+        assert_eq!(
+            signal(None, None, None, Some("my custom ua")).identity(),
+            DeviceIdentity::Unknown
+        );
+        assert_eq!(
+            signal(None, None, None, Some("   ")).identity(),
+            DeviceIdentity::Unknown
+        );
     }
 
     #[test]

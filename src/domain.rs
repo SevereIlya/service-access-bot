@@ -2,6 +2,7 @@ pub mod billing;
 pub mod device;
 pub mod error;
 pub mod notification;
+pub mod referral;
 pub mod subscription;
 pub mod uow;
 pub mod user;

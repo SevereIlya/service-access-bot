@@ -32,6 +32,12 @@ pub struct MsgText {
     pub msg_balance_topped_up: String,
     pub msg_new_device_detected: String,
     pub msg_device_setup_code: String,
+    pub msg_referral_joined: String,
+    pub msg_referral_joined_anonymous: String,
+    pub msg_referral_cashback: String,
+    pub msg_referral_cashback_anonymous: String,
+    pub msg_referral_welcome: String,
+    pub msg_referral_welcome_bonus: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -112,8 +118,8 @@ mod tests {
             ("msg_trial_success_view", m.msg_trial_success_view.as_str(), &["{date}"]),
             ("msg_subscription_expiring", m.msg_subscription_expiring.as_str(), &["{date}"]),
             ("msg_vpn_issued", m.msg_vpn_issued.as_str(), &["{link}"]),
-            ("msg_profile", m.msg_profile.as_str(), &["{telegram_id}", "{referral_code}", "{subscription}"]),
-            ("msg_referral", m.msg_referral.as_str(), &["{link}"]),
+            ("msg_profile", m.msg_profile.as_str(), &["{telegram_id}", "{balance}", "{subscription}"]),
+            ("msg_referral", m.msg_referral.as_str(), &["{link}", "{welcome_bonus}", "{cashback_percent}", "{invited}", "{earned}"]),
             ("msg_purchase_confirm", m.msg_purchase_confirm.as_str(), &["{plan}", "{devices}", "{price}"]),
             ("msg_purchase_insufficient", m.msg_purchase_insufficient.as_str(), &["{plan}", "{devices}", "{price}", "{shortfall}"]),
             ("msg_top_up_link", m.msg_top_up_link.as_str(), &["{amount}"]),
@@ -121,6 +127,10 @@ mod tests {
             ("msg_balance_topped_up", m.msg_balance_topped_up.as_str(), &["{amount}", "{balance}"]),
             ("msg_new_device_detected", m.msg_new_device_detected.as_str(), &["{device}"]),
             ("msg_device_setup_code", m.msg_device_setup_code.as_str(), &["{device}", "{code}"]),
+            ("msg_referral_joined", m.msg_referral_joined.as_str(), &["{friend}"]),
+            ("msg_referral_cashback", m.msg_referral_cashback.as_str(), &["{friend}", "{amount}"]),
+            ("msg_referral_cashback_anonymous", m.msg_referral_cashback_anonymous.as_str(), &["{amount}"]),
+            ("msg_referral_welcome_bonus", m.msg_referral_welcome_bonus.as_str(), &["{bonus}"]),
 
             // stub
             ("stub_awaiting_setup", s.stub_awaiting_setup.as_str(), &["{code}"]),

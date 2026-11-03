@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE users\n            SET role = $1,\n                frozen_base_price = $2,\n                trial_used = $3,\n                discount_percent = $4,\n                username = $5,\n                full_name = $6\n            WHERE id = $7\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Int8",
+        "Bool",
+        "Int4",
+        "Text",
+        "Text",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a647de2b06107c4d1f1ade6496c14095c8c35eda686b5da2ee89ad112d9d48e6"
+}

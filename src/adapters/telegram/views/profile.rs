@@ -1,4 +1,4 @@
-use crate::adapters::telegram::{MessageView, UiText, plan_label};
+use crate::adapters::telegram::{MessageView, UiText, format_rub_exact, plan_label};
 use crate::application::ProfileSnapshot;
 use teloxide::types::{InlineKeyboardButton, InlineKeyboardMarkup};
 
@@ -8,10 +8,12 @@ pub fn build_profile_view(ui: &UiText, snapshot: &ProfileSnapshot) -> MessageVie
         || "Нет активной подписки".to_string(),
         |sub| {
             format!(
-                "Тариф: {}\nДействует до: {} (осталось {} дн.)",
+                "Тариф: {}\nДействует до: {} (осталось {} дн.)\nУстройства: {} из {}",
                 plan_label(ui, sub.plan),
                 sub.expires_at.format("%d.%m.%Y"),
-                sub.days_left.max(0)
+                sub.days_left.max(0),
+                sub.devices.devices_used,
+                sub.devices.devices_limit,
             )
         },
     );
@@ -19,7 +21,7 @@ pub fn build_profile_view(ui: &UiText, snapshot: &ProfileSnapshot) -> MessageVie
         .message
         .msg_profile
         .replace("{telegram_id}", &snapshot.telegram_id.to_string())
-        .replace("{referral_code}", &snapshot.referral_code)
+        .replace("{balance}", &format_rub_exact(snapshot.balance))
         .replace("{subscription}", &subscription_line);
     let keyboard = InlineKeyboardMarkup::new(vec![
         vec![InlineKeyboardButton::callback(

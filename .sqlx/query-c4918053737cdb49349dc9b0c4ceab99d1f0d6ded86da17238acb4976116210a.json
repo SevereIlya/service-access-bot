@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE transactions\n            SET status = $1,\n                provider_tx_id = $2,\n                payload = $3\n            WHERE order_id = $4\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Jsonb",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c4918053737cdb49349dc9b0c4ceab99d1f0d6ded86da17238acb4976116210a"
+}

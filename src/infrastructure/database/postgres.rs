@@ -13,3 +13,9 @@ pub async fn create_pg_pool(database_url: &str) -> Result<PgPool, sqlx::Error> {
         .await?;
     Ok(pool)
 }
+
+/// # Errors
+/// Возвращает ошибку, если миграция не применилась или уже применённая была изменена.
+pub async fn run_migrations(pool: &PgPool) -> Result<(), sqlx::migrate::MigrateError> {
+    sqlx::migrate!("./migrations").run(pool).await
+}

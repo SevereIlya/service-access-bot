@@ -26,6 +26,17 @@ pub(crate) fn format_rub(money: Money) -> String {
     format!("{:.0}", money.as_rubles_f64())
 }
 
+pub(crate) fn format_rub_exact(money: Money) -> String {
+    let kopecks = money.inner();
+    let (rubles, rest) = (kopecks / 100, kopecks % 100);
+
+    if rest == 0 {
+        rubles.to_string()
+    } else {
+        format!("{rubles},{rest:02}")
+    }
+}
+
 pub(crate) fn plan_label(ui: &UiText, plan: SubscriptionPlan) -> String {
     match plan {
         SubscriptionPlan::Week1 => ui.button.btn_tariff_week_1.clone(),

@@ -1,12 +1,12 @@
 use crate::domain::{BillingError, DomainError, DomainResult};
 use std::fmt::{Display, Formatter};
-use std::str::FromStr;
+use strum::{EnumString, IntoStaticStr, VariantArray};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TransactionId(i64);
 
 impl TransactionId {
-    /// Создаёт идентификатор подписки из значения.
+    /// Создаёт идентификатор транзакции из значения.
     #[must_use]
     pub const fn new(id: i64) -> Self {
         Self(id)
@@ -24,46 +24,56 @@ impl Display for TransactionId {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, strum::Display, EnumString, IntoStaticStr, VariantArray,
+)]
+#[strum(
+    serialize_all = "snake_case",
+    parse_err_ty = DomainError,
+    parse_err_fn = TransactionKind::parse_err,
+)]
 pub enum TransactionKind {
+    /// Пополнение через платёжного провайдера
     TopUp,
+
+    /// Списание за тариф
     Purchase,
+
+    /// Кэшбек рефереру с покупки его реферала
     ReferralCashback,
+
+    /// Разовый подарок приглашённому при активации реферальной ссылки
+    ReferralWelcomeBonus,
+
+    /// Возврат средств
     Refund,
 }
 
 impl TransactionKind {
-    #[must_use]
-    pub const fn as_str(&self) -> &'static str {
-        match self {
-            Self::TopUp => "top_up",
-            Self::Purchase => "purchase",
-            Self::ReferralCashback => "referral_cashback",
-            Self::Refund => "refund",
-        }
+    fn parse_err(value: &str) -> DomainError {
+        BillingError::InvalidTransactionKind(value.to_owned()).into()
     }
 
     #[must_use]
     pub const fn is_credit(&self) -> bool {
-        matches!(self, Self::TopUp | Self::ReferralCashback | Self::Refund)
+        matches!(
+            self,
+            Self::TopUp | Self::ReferralCashback | Self::ReferralWelcomeBonus | Self::Refund
+        )
+    }
+
+    #[must_use]
+    pub fn credit_kind_strings() -> Vec<&'static str> {
+        Self::VARIANTS.iter().filter(|kind| kind.is_credit()).map(Into::into).collect()
     }
 }
 
-impl FromStr for TransactionKind {
-    type Err = DomainError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "top_up" => Ok(Self::TopUp),
-            "purchase" => Ok(Self::Purchase),
-            "referral_cashback" => Ok(Self::ReferralCashback),
-            "refund" => Ok(Self::Refund),
-            _ => Err(BillingError::InvalidTransactionKind(s.to_string()).into()),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, strum::Display, EnumString, IntoStaticStr)]
+#[strum(
+    serialize_all = "snake_case",
+    parse_err_ty = DomainError,
+    parse_err_fn = TransactionStatus::parse_err
+)]
 pub enum TransactionStatus {
     Pending,
     Success,
@@ -71,55 +81,26 @@ pub enum TransactionStatus {
 }
 
 impl TransactionStatus {
-    #[must_use]
-    pub const fn as_str(&self) -> &'static str {
-        match self {
-            Self::Pending => "pending",
-            Self::Success => "success",
-            Self::Failed => "failed",
-        }
-    }
-}
-
-impl FromStr for TransactionStatus {
-    type Err = DomainError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "pending" => Ok(Self::Pending),
-            "success" => Ok(Self::Success),
-            "failed" => Ok(Self::Failed),
-            _ => Err(BillingError::InvalidTransactionStatus(s.to_string()).into()),
-        }
+    fn parse_err(value: &str) -> DomainError {
+        BillingError::InvalidTransactionStatus(value.to_owned()).into()
     }
 }
 
 /// `Internal` для операций без внешнего провайдера (списание за тариф, реферальный кэшбек)
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, strum::Display, EnumString, IntoStaticStr)]
+#[strum(
+    serialize_all = "snake_case",
+    parse_err_ty = DomainError,
+    parse_err_fn = PaymentProvider::parse_err
+)]
 pub enum PaymentProvider {
     Platega,
     Internal,
 }
 
 impl PaymentProvider {
-    #[must_use]
-    pub const fn as_str(&self) -> &'static str {
-        match self {
-            Self::Platega => "platega",
-            Self::Internal => "internal",
-        }
-    }
-}
-
-impl FromStr for PaymentProvider {
-    type Err = DomainError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "platega" => Ok(Self::Platega),
-            "internal" => Ok(Self::Internal),
-            _ => Err(BillingError::InvalidPaymentProvider(s.to_string()).into()),
-        }
+    fn parse_err(value: &str) -> DomainError {
+        BillingError::InvalidPaymentProvider(value.to_owned()).into()
     }
 }
 
@@ -137,6 +118,11 @@ impl Money {
     #[must_use]
     pub const fn inner(&self) -> i64 {
         self.0
+    }
+
+    #[must_use]
+    pub const fn is_zero(&self) -> bool {
+        self.0 == 0
     }
 
     /// Значение в копейках как `f64`.
@@ -195,6 +181,7 @@ impl Display for Money {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashSet;
 
     // --- Money ---
     #[test]
@@ -236,5 +223,84 @@ mod tests {
             100,
             "1 копейка всё равно округляется до целого рубля"
         );
+    }
+
+    // --- TransactionKind ---
+    #[test]
+    fn test_kind_str_roundtrip_for_every_variant() {
+        for &kind in TransactionKind::VARIANTS {
+            let string_repr: &'static str = kind.into();
+            let parsed: TransactionKind = string_repr.parse().unwrap();
+            assert_eq!(parsed, kind);
+        }
+    }
+
+    #[test]
+    fn test_kind_unknown_str_is_rejected_with_correct_error() {
+        let bad_str = "crypto";
+        let result: Result<TransactionKind, DomainError> = bad_str.parse();
+
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            DomainError::Billing(BillingError::InvalidTransactionKind(s)) if s == bad_str
+        ));
+    }
+
+    #[test]
+    fn test_kind_variants_have_unique_names() {
+        let names: HashSet<&str> = TransactionKind::VARIANTS.iter().map(Into::into).collect();
+        assert_eq!(names.len(), TransactionKind::VARIANTS.len());
+    }
+
+    #[test]
+    fn test_kind_credit_classification_spec() {
+        for kind in [
+            TransactionKind::TopUp,
+            TransactionKind::ReferralCashback,
+            TransactionKind::ReferralWelcomeBonus,
+            TransactionKind::Refund,
+        ] {
+            assert!(kind.is_credit(), "{kind:?} должен пополнять баланс");
+        }
+        assert!(!TransactionKind::Purchase.is_credit(), "покупка списывает");
+    }
+
+    #[test]
+    fn test_kind_persisted_names_are_pinned() {
+        let pinned = [
+            (TransactionKind::TopUp, "top_up"),
+            (TransactionKind::Purchase, "purchase"),
+            (TransactionKind::ReferralCashback, "referral_cashback"),
+            (
+                TransactionKind::ReferralWelcomeBonus,
+                "referral_welcome_bonus",
+            ),
+            (TransactionKind::Refund, "refund"),
+        ];
+
+        assert_eq!(
+            pinned.len(),
+            TransactionKind::VARIANTS.len(),
+            "добавил вариант - закрепи его имя здесь и в CHECK миграции"
+        );
+        for (kind, expected) in pinned {
+            assert_eq!(<&'static str>::from(kind), expected);
+        }
+    }
+
+    #[test]
+    fn test_kind_credit_kind_strings_are_exactly_the_credits() {
+        let credit_strs = TransactionKind::credit_kind_strings();
+
+        assert_eq!(credit_strs.len(), 4);
+
+        for string in credit_strs {
+            let parsed: TransactionKind = string.parse().unwrap();
+            assert!(
+                parsed.is_credit(),
+                "Строка {string} не является кредитной операцией"
+            );
+        }
     }
 }

@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO vpn_connections (user_id, node_id, is_synced, created_at)\n            VALUES ($1, $2, $3, $4)\n            ON CONFLICT (user_id, node_id)\n            DO UPDATE SET is_synced = EXCLUDED.is_synced\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8",
+        "Bool",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e8e71df9e3284dcd60576bd47a6ce6fd13ba7dd65b907b97c5cc472db2d214ee"
+}

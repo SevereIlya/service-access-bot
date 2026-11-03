@@ -59,6 +59,7 @@ mod tests {
     use crate::domain::{
         DomainResult,
         billing::Money,
+        referral::DynReferralRepository,
         subscription::{DynSubscriptionRepository, SubscriptionRepository},
         uow::{BoxedUowContext, UnitOfWork, UowContext},
         user::{
@@ -101,6 +102,9 @@ mod tests {
             _token: &SubscriptionToken,
         ) -> DomainResult<Option<User>> {
             unreachable!("find_by_subscription_token() не используется в этом юзкейсе")
+        }
+        async fn find_by_referral_code(&self, _code: &ReferralCode) -> DomainResult<Option<User>> {
+            unreachable!("find_by_referral_code() не используется в этом юзкейсе")
         }
     }
 
@@ -172,6 +176,9 @@ mod tests {
         fn transactions(&self) -> DynTransactionRepository {
             unreachable!("transactions() не используется в этом юзкейсе")
         }
+        fn referrals(&self) -> DynReferralRepository {
+            unreachable!("referrals() не используется в этом юзкейсе")
+        }
         async fn commit(&mut self) -> DomainResult<()> {
             *self.committed.lock().unwrap() = true;
             Ok(())
@@ -224,15 +231,15 @@ mod tests {
         user
     }
 
-    fn setup_command(
-        has_active_sub: bool,
-    ) -> (
-        StartTrialCommand,
-        Arc<MockUserRepository>,
-        Arc<MockSubscriptionRepository>,
-        Arc<Mutex<bool>>,
-        Arc<Mutex<bool>>,
-    ) {
+    struct StartTrialTestContext {
+        command: StartTrialCommand,
+        user_repo: Arc<MockUserRepository>,
+        sub_repo: Arc<MockSubscriptionRepository>,
+        committed: Arc<Mutex<bool>>,
+        rolled_back: Arc<Mutex<bool>>,
+    }
+
+    fn setup_command(has_active_sub: bool) -> StartTrialTestContext {
         let user_repo = Arc::new(MockUserRepository {
             updated_users: Arc::new(Mutex::new(Vec::new())),
         });
@@ -250,13 +257,13 @@ mod tests {
             rolled_back: rolled_back.clone(),
         });
 
-        (
-            StartTrialCommand::new(mock_uow),
+        StartTrialTestContext {
+            command: StartTrialCommand::new(mock_uow),
             user_repo,
             sub_repo,
             committed,
             rolled_back,
-        )
+        }
     }
 
     // ==========================================
@@ -265,7 +272,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_start_trial_success() {
-        let (cmd, user_repo, sub_repo, committed, rolled_back) = setup_command(false);
+        let StartTrialTestContext {
+            command: cmd,
+            user_repo,
+            sub_repo,
+            committed,
+            rolled_back,
+        } = setup_command(false);
         let user = create_test_user(true, false);
         let result = cmd.execute(user).await;
 
@@ -300,6 +313,7 @@ mod tests {
             updated_users[0].trial_used(),
             "Флаг trial_used должен быть установлен"
         );
+        drop(updated_users);
 
         let created_subs = sub_repo.created_subscriptions.lock().unwrap();
 
@@ -320,7 +334,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_fails_if_user_not_saved_in_db() {
-        let (cmd, _user_repo, _sub_repo, committed, _rolled_back) = setup_command(false);
+        let StartTrialTestContext {
+            command: cmd,
+            user_repo: _,
+            sub_repo: _,
+            committed,
+            rolled_back: _,
+        } = setup_command(false);
         let user = create_test_user(false, false);
         let result = cmd.execute(user).await;
 
@@ -338,7 +358,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_fails_if_trial_already_used() {
-        let (cmd, _user_repo, _sub_repo, committed, _rolled_back) = setup_command(false);
+        let StartTrialTestContext {
+            command: cmd,
+            user_repo: _,
+            sub_repo: _,
+            committed,
+            rolled_back: _,
+        } = setup_command(false);
         let user = create_test_user(true, true);
         let result = cmd.execute(user).await;
 
@@ -355,7 +381,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_fails_if_user_has_active_subscription() {
-        let (cmd, _user_repo, _sub_repo, committed, rolled_back) = setup_command(true);
+        let StartTrialTestContext {
+            command: cmd,
+            user_repo: _,
+            sub_repo: _,
+            committed,
+            rolled_back,
+        } = setup_command(true);
         let user = create_test_user(true, false);
         let result = cmd.execute(user).await;
 

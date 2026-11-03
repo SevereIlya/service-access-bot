@@ -165,7 +165,10 @@ mod tests {
         },
         device::{DeviceName, DeviceSetupCode},
         notification::Notifier,
-        user::{ReferralCode, SubscriptionToken, TelegramId, User, UserId, UserRepository},
+        user::{
+            PublicIdentity, ReferralCode, SubscriptionToken, TelegramId, User, UserId,
+            UserRepository,
+        },
     };
     use async_trait::async_trait;
     use chrono::{DateTime, Utc};
@@ -226,6 +229,13 @@ mod tests {
         async fn balance_for_user(&self, _user_id: UserId) -> DomainResult<Money> {
             Ok(self.balance)
         }
+        async fn sum_for_user_by_kind(
+            &self,
+            _user_id: UserId,
+            _kind: TransactionKind,
+        ) -> DomainResult<Money> {
+            unreachable!("sum_for_user_by_kind() не используется в этом юзкейсе")
+        }
     }
 
     struct MockUserRepository {
@@ -254,6 +264,9 @@ mod tests {
             _token: &SubscriptionToken,
         ) -> DomainResult<Option<User>> {
             unreachable!("find_by_subscription_token() не используется в этом юзкейсе")
+        }
+        async fn find_by_referral_code(&self, _code: &ReferralCode) -> DomainResult<Option<User>> {
+            unreachable!("find_by_referral_code() не используется в этом юзкейсе")
         }
     }
 
@@ -296,6 +309,21 @@ mod tests {
             _code: &DeviceSetupCode,
         ) -> DomainResult<()> {
             unreachable!("notify_device_setup_code() не используется в этом юзкейсе")
+        }
+        async fn notify_referral_joined(
+            &self,
+            _referrer: &User,
+            _friend: Option<PublicIdentity>,
+        ) -> DomainResult<()> {
+            unreachable!("notify_referral_joined() не используется в этом юзкейсе")
+        }
+        async fn notify_referral_cashback(
+            &self,
+            _referrer: &User,
+            _friend: Option<PublicIdentity>,
+            _amount: Money,
+        ) -> DomainResult<()> {
+            unreachable!("notify_referral_cashback() не используется в этом юзкейсе")
         }
     }
 
@@ -361,14 +389,14 @@ mod tests {
         let user_repo: DynUserRepository = Arc::new(MockUserRepository {
             user: Some(make_test_user()),
         });
-        let notified = Arc::new(Mutex::new(Vec::new()));
+        let notifications = Arc::new(Mutex::new(Vec::new()));
         let notifier: DynNotifier = Arc::new(MockNotifier {
-            notified: notified.clone(),
+            notified: notifications.clone(),
         });
         (
             ProcessPaymentWebhookCommand::new(repo, gateway, user_repo, notifier),
             updated,
-            notified,
+            notifications,
         )
     }
 
@@ -400,6 +428,7 @@ mod tests {
             updated[0].payload().is_some(),
             "сырой ответ провайдера - улика для разбора"
         );
+        drop(updated);
         assert!(
             notified.lock().unwrap().is_empty(),
             "chargeback - не пополнение, уведомлять не о чем"
@@ -474,6 +503,7 @@ mod tests {
             updated[0].payload().is_some(),
             "сырой ответ с реальной суммой - улика"
         );
+        drop(updated);
         assert!(
             notified.lock().unwrap().is_empty(),
             "недоплата - не зачисление, уведомлять не о чем"

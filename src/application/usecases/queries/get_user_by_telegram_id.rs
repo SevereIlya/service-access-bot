@@ -60,6 +60,9 @@ mod tests {
         ) -> DomainResult<Option<User>> {
             unreachable!("find_by_subscription_token() не используется в этом юзкейсе")
         }
+        async fn find_by_referral_code(&self, _code: &ReferralCode) -> DomainResult<Option<User>> {
+            unreachable!("find_by_referral_code() не используется в этом юзкейсе")
+        }
     }
 
     // ==========================================
@@ -86,7 +89,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_user_returns_user_when_found() {
-        let target_tg_id = 999999;
+        let target_tg_id = 999_999;
         let existing_user = create_test_user(target_tg_id);
 
         let repo = Arc::new(MockUserRepository {

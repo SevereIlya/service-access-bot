@@ -1,10 +1,10 @@
-use crate::adapters::telegram::{UiText, format_rub};
+use crate::adapters::telegram::{UiText, format_rub_exact};
 use crate::domain::{
     DomainError, DomainResult,
     billing::Money,
     device::{DeviceName, DeviceSetupCode},
     notification::Notifier,
-    user::User,
+    user::{PublicIdentity, User},
 };
 use async_trait::async_trait;
 use chrono::{DateTime, FixedOffset, Utc};
@@ -61,6 +61,13 @@ impl TelegramNotifier {
             Err(e) => Err(DomainError::SystemFailure(e.to_string())),
         }
     }
+
+    fn render_friend(friend: &PublicIdentity) -> String {
+        match friend {
+            PublicIdentity::Username(username) => format!("@{}", escape(username)),
+            PublicIdentity::Name(name) => format!("<b>{}</b>", escape(name)),
+        }
+    }
 }
 
 #[async_trait]
@@ -94,8 +101,8 @@ impl Notifier for TelegramNotifier {
             .ui
             .message
             .msg_balance_topped_up
-            .replace("{amount}", &format_rub(amount))
-            .replace("{balance}", &format_rub(new_balance));
+            .replace("{amount}", &format_rub_exact(amount))
+            .replace("{balance}", &format_rub_exact(new_balance));
         let keyboard = InlineKeyboardMarkup::new(vec![vec![InlineKeyboardButton::callback(
             self.ui.button.btn_menu_tariffs.clone(),
             "menu:tariffs",
@@ -133,5 +140,63 @@ impl Notifier for TelegramNotifier {
             .replace("{device}", &escape(device_name.inner()));
 
         self.send_html(user, text, None).await
+    }
+
+    async fn notify_referral_joined(
+        &self,
+        referrer: &User,
+        friend: Option<PublicIdentity>,
+    ) -> DomainResult<()> {
+        let text = friend.map_or_else(
+            || self.ui.message.msg_referral_joined_anonymous.clone(),
+            |friend| {
+                self.ui
+                    .message
+                    .msg_referral_joined
+                    .replace("{friend}", &Self::render_friend(&friend))
+            },
+        );
+        self.send_html(referrer, text, None).await
+    }
+
+    async fn notify_referral_cashback(
+        &self,
+        referrer: &User,
+        friend: Option<PublicIdentity>,
+        amount: Money,
+    ) -> DomainResult<()> {
+        let amount = format_rub_exact(amount);
+        let text = friend.map_or_else(
+            || self.ui.message.msg_referral_cashback_anonymous.replace("{amount}", &amount),
+            |friend| {
+                // следим за порядком плейсхолдеров
+                self.ui
+                    .message
+                    .msg_referral_cashback
+                    .replace("{amount}", &amount)
+                    .replace("{friend}", &Self::render_friend(&friend))
+            },
+        );
+        self.send_html(referrer, text, None).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_render_friend_username_gets_at_sign() {
+        let rendered = TelegramNotifier::render_friend(&PublicIdentity::Username("alice".into()));
+
+        assert_eq!(rendered, "@alice");
+    }
+
+    #[test]
+    fn test_render_friend_escapes_html_in_name() {
+        let rendered =
+            TelegramNotifier::render_friend(&PublicIdentity::Name("<b>Evil & Co</b>".into()));
+
+        assert_eq!(rendered, "<b>&lt;b&gt;Evil &amp; Co&lt;/b&gt;</b>");
     }
 }

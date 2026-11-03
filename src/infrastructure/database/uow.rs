@@ -1,14 +1,15 @@
 use crate::domain::{
     DomainError, DomainResult,
     billing::DynTransactionRepository,
+    referral::DynReferralRepository,
     subscription::DynSubscriptionRepository,
     uow::{BoxedUowContext, UnitOfWork, UowContext},
     user::DynUserRepository,
     vpn::{DynNodeRepository, DynVpnConnectionRepository},
 };
 use crate::infrastructure::{
-    SharedTransaction, SqlxNodeRepository, SqlxSubscriptionRepository, SqlxTransactionRepository,
-    SqlxUserRepository, SqlxVpnConnectionRepository,
+    SharedTransaction, SqlxNodeRepository, SqlxReferralRepository, SqlxSubscriptionRepository,
+    SqlxTransactionRepository, SqlxUserRepository, SqlxVpnConnectionRepository,
 };
 use async_trait::async_trait;
 use sqlx::{PgPool, Postgres, Transaction};
@@ -59,6 +60,9 @@ impl UowContext for SqlxUowContext {
     }
     fn transactions(&self) -> DynTransactionRepository {
         Arc::new(SqlxTransactionRepository::transaction(self.tx.clone()))
+    }
+    fn referrals(&self) -> DynReferralRepository {
+        Arc::new(SqlxReferralRepository::transaction(self.tx.clone()))
     }
 
     async fn commit(&mut self) -> DomainResult<()> {

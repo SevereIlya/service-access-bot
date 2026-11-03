@@ -9,6 +9,10 @@ uuid_namespace = "00000000-0000-0000-0000-000000000000"
 [payments]
 base_price = 000
 
+[referral]
+welcome_bonus = 0
+cashback_percent = 0
+
 [payments.platega]
 base_url = ""
 merchant_id = ""

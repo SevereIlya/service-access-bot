@@ -7,6 +7,27 @@ use crate::domain::{
 use tracing::{info, warn};
 use uuid::Uuid;
 
+/// Результат `/start`-регистрации.
+#[derive(Debug)]
+pub enum Registration {
+    Created(User),
+    Existing(User),
+}
+
+impl Registration {
+    #[must_use]
+    pub const fn is_created(&self) -> bool {
+        matches!(self, Self::Created(_))
+    }
+
+    #[must_use]
+    pub fn into_user(self) -> User {
+        match self {
+            Self::Created(user) | Self::Existing(user) => user,
+        }
+    }
+}
+
 pub struct RegisterUserCommand {
     user_repo: DynUserRepository,
     uuid_namespace: Uuid,
@@ -27,7 +48,7 @@ impl RegisterUserCommand {
         telegram_id: i64,
         username: Option<String>,
         full_name: String,
-    ) -> AppResult<User> {
+    ) -> AppResult<Registration> {
         let telegram_id = TelegramId::new(telegram_id);
 
         if let Some(mut user) = self.user_repo.find_by_telegram_id(telegram_id).await? {
@@ -45,7 +66,7 @@ impl RegisterUserCommand {
                 );
             }
 
-            return Ok(user);
+            return Ok(Registration::Existing(user));
         }
 
         let user_uuid = Uuid::new_v5(&self.uuid_namespace, telegram_id.to_string().as_bytes());
@@ -79,7 +100,7 @@ impl RegisterUserCommand {
                     let mut saved_user = new_user;
                     saved_user.assign_id(inserted_id);
 
-                    return Ok(saved_user);
+                    return Ok(Registration::Created(saved_user));
                 }
                 Err(DomainError::User(UserError::ReferralCodeCollision)) => {
                     if attempts >= 5 {
@@ -94,7 +115,7 @@ impl RegisterUserCommand {
                     let user = self.user_repo.find_by_telegram_id(telegram_id).await?.ok_or_else(
                         || DomainError::SystemFailure("User exists but not found".into()),
                     )?;
-                    return Ok(user);
+                    return Ok(Registration::Existing(user));
                 }
                 Err(e) => return Err(e.into()),
             }
@@ -119,14 +140,21 @@ mod tests {
     struct MockUserRepository {
         existing_user: Option<User>,
         collisions_to_simulate: Mutex<u8>,
+        raced_user: Option<User>,
+        create_called: Mutex<bool>,
     }
 
     #[async_trait]
     impl UserRepository for MockUserRepository {
         async fn create(&self, _user: &User) -> DomainResult<UserId> {
+            *self.create_called.lock().unwrap() = true;
+            if self.raced_user.is_some() {
+                return Err(DomainError::User(UserError::AlreadyExists));
+            }
             let mut cols = self.collisions_to_simulate.lock().unwrap();
             if *cols > 0 {
                 *cols -= 1;
+                drop(cols);
                 return Err(DomainError::User(UserError::ReferralCodeCollision));
             }
             Ok(UserId::new(99))
@@ -141,6 +169,9 @@ mod tests {
             &self,
             _telegram_id: TelegramId,
         ) -> DomainResult<Option<User>> {
+            if *self.create_called.lock().unwrap() {
+                return Ok(self.raced_user.clone());
+            }
             Ok(self.existing_user.clone())
         }
         async fn find_by_subscription_token(
@@ -149,16 +180,25 @@ mod tests {
         ) -> DomainResult<Option<User>> {
             unreachable!("find_by_subscription_token() не используется в этом юзкейсе")
         }
+        async fn find_by_referral_code(&self, _code: &ReferralCode) -> DomainResult<Option<User>> {
+            unreachable!("find_by_referral_code() не используется в этом юзкейсе")
+        }
     }
 
     // ==========================================
     // Хелперы
     // ==========================================
 
-    fn setup_command(existing_user: Option<User>, collisions: u8) -> RegisterUserCommand {
+    fn setup_command(
+        existing_user: Option<User>,
+        collisions: u8,
+        raced_user: Option<User>,
+    ) -> RegisterUserCommand {
         let mock_repo = Arc::new(MockUserRepository {
             existing_user,
             collisions_to_simulate: Mutex::new(collisions),
+            raced_user,
+            create_called: Mutex::new(false),
         });
         RegisterUserCommand::new(mock_repo, uuid::Uuid::new_v4(), Money::new(15000).unwrap())
     }
@@ -169,12 +209,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_register_new_user_success() {
-        let cmd = setup_command(None, 0);
-        let result = cmd.execute(123, Some("freddie".into()), "Freddie Mercury".into()).await;
+        let cmd = setup_command(None, 0, None);
+        let registration = cmd
+            .execute(123, Some("freddie".into()), "Freddie Mercury".into())
+            .await
+            .unwrap();
 
-        assert!(result.is_ok());
+        assert!(registration.is_created());
 
-        let user = result.unwrap();
+        let user = registration.into_user();
 
         assert_eq!(user.id(), Some(UserId::new(99)));
         assert_eq!(user.frozen_base_price(), Money::new(15000).unwrap());
@@ -192,12 +235,18 @@ mod tests {
             SubscriptionToken::new("B".into()),
         );
         existing_user.assign_id(UserId::new(42));
-        let cmd = setup_command(Some(existing_user), 0);
-        let result = cmd.execute(123, Some("freddie".into()), "Freddie Mercury".into()).await;
+        let cmd = setup_command(Some(existing_user), 0, None);
+        let registration = cmd
+            .execute(123, Some("freddie".into()), "Freddie Mercury".into())
+            .await
+            .unwrap();
 
-        assert!(result.is_ok());
+        assert!(
+            !registration.is_created(),
+            "старый юзер не должен считаться новым"
+        );
         assert_eq!(
-            result.unwrap().id(),
+            registration.into_user().id(),
             Some(UserId::new(42)),
             "Должен вернуть старого юзера"
         );
@@ -205,19 +254,19 @@ mod tests {
 
     #[tokio::test]
     async fn test_retry_works_on_referral_collision() {
-        let cmd = setup_command(None, 2);
-        let result = cmd.execute(123, Some("freddie".into()), "Freddie Mercury".into()).await;
+        let cmd = setup_command(None, 2, None);
+        let registration = cmd
+            .execute(123, Some("freddie".into()), "Freddie Mercury".into())
+            .await
+            .expect("Цикл должен был повторить попытку и успешно сохранить юзера");
 
-        assert!(
-            result.is_ok(),
-            "Цикл должен был повторить попытку и успешно сохранить юзера"
-        );
-        assert_eq!(result.unwrap().id(), Some(UserId::new(99)));
+        assert!(registration.is_created());
+        assert_eq!(registration.into_user().id(), Some(UserId::new(99)));
     }
 
     #[tokio::test]
     async fn test_fails_after_max_retries() {
-        let cmd = setup_command(None, 10);
+        let cmd = setup_command(None, 10, None);
         let result = cmd
             .execute(
                 123,
@@ -230,5 +279,31 @@ mod tests {
             result.unwrap_err(),
             AppError::MaxRetriesExceeded(_)
         ));
+    }
+
+    #[tokio::test]
+    async fn test_race_loser_is_existing_not_created() {
+        let mut winner = User::new(
+            TelegramId::new(123),
+            Uuid::new_v4(),
+            Some("freddie".into()),
+            "Freddie Mercury".into(),
+            Money::new(10).unwrap(),
+            ReferralCode::new("W".into()),
+            SubscriptionToken::new("W".into()),
+        );
+        winner.assign_id(UserId::new(7));
+        let cmd = setup_command(None, 0, Some(winner));
+
+        let registration = cmd
+            .execute(123, Some("freddie".into()), "Freddie Mercury".into())
+            .await
+            .unwrap();
+
+        assert!(
+            !registration.is_created(),
+            "проигравший гонку не должен получить реферальный бонус второй раз"
+        );
+        assert_eq!(registration.into_user().id(), Some(UserId::new(7)));
     }
 }

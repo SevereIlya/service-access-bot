@@ -15,6 +15,9 @@ pub enum DomainError {
     Node(#[from] NodeError),
 
     #[error(transparent)]
+    Referral(#[from] ReferralError),
+
+    #[error(transparent)]
     Subscription(#[from] SubscriptionError),
 
     #[error("System failure: {0}")]
@@ -76,6 +79,21 @@ pub enum NodeError {
 }
 
 #[derive(Error, Debug)]
+pub enum ReferralError {
+    #[error("User is already referred by someone")]
+    AlreadyReferred,
+
+    #[error("Entity has no ID. It must be saved to the database first.")]
+    EntityNotSaved,
+
+    #[error("Invalid cashback percent: {0}")]
+    InvalidCashbackPercent(i32),
+
+    #[error("User cannot refer themselves")]
+    SelfReferral,
+}
+
+#[derive(Error, Debug)]
 pub enum SubscriptionError {
     #[error("Already has active subscription")]
     AlreadyHasActive,
@@ -109,6 +127,9 @@ pub enum UserError {
 
     #[error("Invalid money: {0}")]
     InvalidMoney(i64),
+
+    #[error("Invalid referral code")]
+    InvalidReferralCode,
 
     #[error("Invalid role: {0}")]
     InvalidRole(String),

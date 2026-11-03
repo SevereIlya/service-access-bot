@@ -1,8 +1,10 @@
 use crate::application::AppResult;
-use crate::domain::billing::{DynTransactionRepository, Money, calculate_price};
-use crate::domain::subscription::{SubscriptionDevices, SubscriptionPlan};
-use crate::domain::user::User;
-use crate::domain::{DomainError, UserError};
+use crate::domain::{
+    DomainError, UserError,
+    billing::{DynTransactionRepository, Money, calculate_price},
+    subscription::{SubscriptionDevices, SubscriptionPlan},
+    user::User,
+};
 
 pub struct PurchaseQuote {
     pub price: Money,
@@ -49,7 +51,7 @@ mod tests {
     use super::*;
     use crate::domain::{
         DomainResult,
-        billing::{Transaction, TransactionId, TransactionRepository},
+        billing::{Transaction, TransactionId, TransactionKind, TransactionRepository},
         user::{ReferralCode, SubscriptionToken, TelegramId, UserId},
     };
     use async_trait::async_trait;
@@ -79,6 +81,13 @@ mod tests {
         }
         async fn balance_for_user(&self, _user_id: UserId) -> DomainResult<Money> {
             Ok(self.balance)
+        }
+        async fn sum_for_user_by_kind(
+            &self,
+            _user_id: UserId,
+            _kind: TransactionKind,
+        ) -> DomainResult<Money> {
+            unreachable!("sum_for_user_by_kind() не используется в этом юзкейсе")
         }
     }
 

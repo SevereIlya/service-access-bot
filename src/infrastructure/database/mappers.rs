@@ -1,14 +1,14 @@
-use crate::domain::billing::TransactionId;
 use crate::domain::{
     DomainError,
-    billing::{Money, Transaction},
+    billing::{Money, Transaction, TransactionId},
     device::{Device, DeviceFingerprint, DeviceId, DeviceName, DeviceSignal},
+    referral::{Referral, ReferralId},
     subscription::{Subscription, SubscriptionDevices, SubscriptionId},
     user::{DiscountPercent, ReferralCode, SubscriptionToken, TelegramId, User, UserId},
     vpn::{Node, NodeId, VpnConnection, VpnConnectionId},
 };
 use crate::infrastructure::{
-    DeviceRow, NodeRow, SubscriptionRow, TransactionRow, UserRow, VpnConnectionRow,
+    DeviceRow, NodeRow, ReferralRow, SubscriptionRow, TransactionRow, UserRow, VpnConnectionRow,
 };
 
 impl TryFrom<UserRow> for User {
@@ -115,6 +115,19 @@ impl TryFrom<TransactionRow> for Transaction {
             row.order_id,
             row.provider_tx_id,
             row.payload,
+            row.created_at,
+        ))
+    }
+}
+
+impl TryFrom<ReferralRow> for Referral {
+    type Error = DomainError;
+
+    fn try_from(row: ReferralRow) -> Result<Self, Self::Error> {
+        Ok(Self::restore_from_db(
+            ReferralId::new(row.id),
+            UserId::new(row.referrer_id),
+            UserId::new(row.referred_id),
             row.created_at,
         ))
     }

@@ -205,9 +205,12 @@ mod tests {
         }
     }
 
+    type VpnConfigGenerationCall = (Vec<String>, Uuid);
+    type VpnConfigGenerationCalls = Arc<Mutex<Vec<VpnConfigGenerationCall>>>;
+
     struct MockVpnConfigGenerator {
         output: String,
-        calls: Arc<Mutex<Vec<(Vec<String>, Uuid)>>>,
+        calls: VpnConfigGenerationCalls,
     }
 
     impl VpnConfigGenerator for MockVpnConfigGenerator {
@@ -586,11 +589,13 @@ mod tests {
             "Стейт в БД должен сохраниться только для good_node"
         );
 
-        let gen_calls = generator_calls.lock().unwrap();
+        let names = {
+            let gen_calls = generator_calls.lock().unwrap();
 
-        assert_eq!(gen_calls.len(), 1, "Генератор должен быть вызван один раз");
+            assert_eq!(gen_calls.len(), 1, "Генератор должен быть вызван один раз");
 
-        let (names, _) = &gen_calls[0];
+            gen_calls[0].0.clone()
+        };
 
         assert_eq!(
             names.len(),

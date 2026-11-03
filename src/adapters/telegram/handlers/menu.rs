@@ -200,10 +200,12 @@ pub async fn handle_referral(
         bot.send_message(chat_id, text).await?;
         return Ok(());
     };
+    let overview = state.usecases.get_referral_overview.execute(&user).await?;
     let view = views::build_referral_view(
         &state.ui_text,
         &state.bot_username,
         user.referral_code().inner(),
+        &overview,
     );
     render_view(&bot, &msg, view).await
 }

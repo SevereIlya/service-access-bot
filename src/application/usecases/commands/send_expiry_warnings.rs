@@ -87,7 +87,10 @@ mod tests {
             Subscription, SubscriptionDevices, SubscriptionPlan, SubscriptionRepository,
             SubscriptionStatus,
         },
-        user::{ReferralCode, SubscriptionToken, TelegramId, User, UserId, UserRepository},
+        user::{
+            PublicIdentity, ReferralCode, SubscriptionToken, TelegramId, User, UserId,
+            UserRepository,
+        },
     };
     use async_trait::async_trait;
     use chrono::{DateTime, Days, Utc};
@@ -125,6 +128,9 @@ mod tests {
         ) -> DomainResult<Option<User>> {
             unreachable!("find_by_subscription_token() не используется в этом юзкейсе")
         }
+        async fn find_by_referral_code(&self, _code: &ReferralCode) -> DomainResult<Option<User>> {
+            unreachable!("find_by_referral_code() не используется в этом юзкейсе")
+        }
     }
 
     struct MockSubscriptionRepository {
@@ -159,9 +165,11 @@ mod tests {
         }
     }
 
+    type NotificationCall = (UserId, DateTime<Utc>);
+    type NotificationCalls = Arc<Mutex<Vec<NotificationCall>>>;
     struct MockNotifier {
         fail: bool,
-        calls: Arc<Mutex<Vec<(UserId, DateTime<Utc>)>>>,
+        calls: NotificationCalls,
     }
 
     #[async_trait]
@@ -202,6 +210,21 @@ mod tests {
             _code: &DeviceSetupCode,
         ) -> DomainResult<()> {
             unreachable!("notify_device_setup_code() не используется в этом юзкейсе")
+        }
+        async fn notify_referral_joined(
+            &self,
+            _referrer: &User,
+            _friend: Option<PublicIdentity>,
+        ) -> DomainResult<()> {
+            unreachable!("notify_referral_joined() не используется в этом юзкейсе")
+        }
+        async fn notify_referral_cashback(
+            &self,
+            _referrer: &User,
+            _friend: Option<PublicIdentity>,
+            _amount: Money,
+        ) -> DomainResult<()> {
+            unreachable!("notify_referral_cashback() не используется в этом юзкейсе")
         }
     }
 
@@ -300,6 +323,7 @@ mod tests {
             updated_guard[0].is_warning_sent(),
             "Флаг должен быть установлен"
         );
+        drop(updated_guard);
     }
 
     #[tokio::test]

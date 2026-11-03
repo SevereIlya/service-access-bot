@@ -1,6 +1,6 @@
 use crate::domain::{
     DomainError, DomainResult,
-    billing::{Money, Transaction, TransactionId, TransactionRepository},
+    billing::{Money, Transaction, TransactionId, TransactionKind, TransactionRepository},
     user::UserId,
 };
 use crate::exec_query;
@@ -40,9 +40,9 @@ impl TransactionRepository for SqlxTransactionRepository {
             "#,
             tx.user_id().inner(),
             tx.amount().inner(),
-            tx.kind().as_str(),
-            tx.status().as_str(),
-            tx.provider().as_str(),
+            <&'static str>::from(tx.kind()),
+            <&'static str>::from(tx.status()),
+            <&'static str>::from(tx.provider()),
             tx.order_id(),
             tx.provider_tx_id(),
             tx.payload().cloned(),
@@ -64,7 +64,7 @@ impl TransactionRepository for SqlxTransactionRepository {
                 payload = $3
             WHERE order_id = $4
             "#,
-            tx.status().as_str(),
+            <&'static str>::from(tx.status()),
             tx.provider_tx_id(),
             tx.payload().cloned(),
             tx.order_id(),
@@ -125,16 +125,20 @@ impl TransactionRepository for SqlxTransactionRepository {
             DomainError::SystemFailure(format!("Не удалось заблокировать юзера {user_id}: {e}"))
         })?;
 
+        let credit_kinds: Vec<String> =
+            TransactionKind::credit_kind_strings().into_iter().map(String::from).collect();
+
         // Читаем баланс уже после блокировки, чтобы отловить все изменения
         let balance = sqlx::query_scalar!(
             r#"
             SELECT COALESCE(SUM(
-                CASE WHEN kind IN ('top_up', 'referral_cashback', 'refund')
+                CASE WHEN kind = ANY($1::TEXT[])
                      THEN amount ELSE -amount END
             ), 0)::BIGINT AS "balance!: i64"
             FROM transactions
-            WHERE user_id = $1 AND status = 'success'
+            WHERE user_id = $2 AND status = 'success'
             "#,
+            &credit_kinds[..],
             user_id.inner(),
         );
 
@@ -143,6 +147,32 @@ impl TransactionRepository for SqlxTransactionRepository {
 
         Money::new(value).map_err(|_| {
             DomainError::SystemFailure(format!("Баланс юзера {user_id} ушёл в минус: {value}"))
+        })
+    }
+
+    #[instrument(skip(self))]
+    async fn sum_for_user_by_kind(
+        &self,
+        user_id: UserId,
+        kind: TransactionKind,
+    ) -> DomainResult<Money> {
+        let query = sqlx::query_scalar!(
+            r#"
+            SELECT COALESCE(SUM(amount), 0)::BIGINT AS "total!: i64"
+            FROM transactions
+            WHERE user_id = $1 AND kind = $2 AND status = 'success'
+            "#,
+            user_id.inner(),
+            <&'static str>::from(kind),
+        );
+
+        let value: i64 = exec_query!(self.executor, query, fetch_one)
+            .map_err(|e| DomainError::SystemFailure(e.to_string()))?;
+
+        Money::new(value).map_err(|_| {
+            DomainError::SystemFailure(format!(
+                "Сумма транзакций юзера {user_id} ушла в минус: {value}"
+            ))
         })
     }
 }

@@ -233,14 +233,7 @@ mod tests {
         let expires_at = starts_at + Months::new(3);
         let status = SubscriptionStatus::Active;
         let devices = SubscriptionDevices::new(2).unwrap();
-        let subscription = Subscription::new(
-            user_id,
-            plan.clone(),
-            starts_at,
-            expires_at,
-            status.clone(),
-            devices,
-        );
+        let subscription = Subscription::new(user_id, plan, starts_at, expires_at, status, devices);
         assert_eq!(subscription.id, None);
         assert_eq!(subscription.user_id, user_id);
         assert_eq!(subscription.plan, plan);
@@ -248,7 +241,7 @@ mod tests {
         assert_eq!(subscription.expires_at, expires_at);
         assert_eq!(subscription.status, status);
         assert_eq!(subscription.devices, devices);
-        assert_eq!(subscription.is_warning_sent, false);
+        assert!(!subscription.is_warning_sent);
     }
 
     #[test]
@@ -353,7 +346,7 @@ mod tests {
         let sub = create_test_subscription(SubscriptionPlan::Month3, SubscriptionStatus::Active, 5);
         let days = sub.days_until_expiry();
         assert!(
-            days >= 4 && days <= 5,
+            (4..=5).contains(&days),
             "Должно быть примерно 5 дней до истечения"
         );
     }
@@ -378,7 +371,7 @@ mod tests {
 
     #[test]
     fn test_restore_from_db_and_getters() {
-        let id = SubscriptionId::new(100500);
+        let id = SubscriptionId::new(100_500);
         let user_id = UserId::new(42);
         let plan = SubscriptionPlan::Month6;
         let starts_at = Utc::now() - Days::new(10);
@@ -423,7 +416,7 @@ mod tests {
         );
 
         let expected_id = SubscriptionId::new(999);
-        sub.assign_id(expected_id.clone());
+        sub.assign_id(expected_id);
 
         assert_eq!(
             sub.id(),

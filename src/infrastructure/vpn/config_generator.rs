@@ -249,7 +249,10 @@ rules:
         let group = tree["proxy-groups"][0]["proxies"].as_sequence().unwrap();
         for member in group {
             let name = member.as_str().unwrap();
-            assert!(name == "DIRECT" || known.contains(name), "'{name}' нет среди proxies");
+            assert!(
+                name == "DIRECT" || known.contains(name),
+                "'{name}' нет среди proxies"
+            );
         }
 
         assert_eq!(group.last().and_then(Value::as_str), Some("DIRECT"));
@@ -273,6 +276,9 @@ rules:
         let tree = render_stub(std::slice::from_ref(&message));
 
         assert_eq!(tree["proxies"][0]["name"].as_str(), Some(message.as_str()));
-        assert_eq!(tree["proxy-groups"][0]["proxies"][0].as_str(), Some(message.as_str()));
+        assert_eq!(
+            tree["proxy-groups"][0]["proxies"][0].as_str(),
+            Some(message.as_str())
+        );
     }
 }

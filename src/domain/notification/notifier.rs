@@ -1,7 +1,9 @@
-use crate::domain::DomainResult;
-use crate::domain::billing::Money;
-use crate::domain::device::{DeviceName, DeviceSetupCode};
-use crate::domain::user::User;
+use crate::domain::{
+    DomainResult,
+    billing::Money,
+    device::{DeviceName, DeviceSetupCode},
+    user::{PublicIdentity, User},
+};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use std::sync::Arc;
@@ -42,5 +44,23 @@ pub trait Notifier: Send + Sync {
         user: &User,
         device_name: &DeviceName,
         code: &DeviceSetupCode,
+    ) -> DomainResult<()>;
+
+    /// Уведомляет реферера, что по его ссылке пришёл новый пользователь.
+    ///
+    /// `friend` информация о приглашённом;
+    /// `None` показывать нечего, уведомление будет анонимным.
+    async fn notify_referral_joined(
+        &self,
+        referrer: &User,
+        friend: Option<PublicIdentity>,
+    ) -> DomainResult<()>;
+
+    /// Уведомляет реферера о кэшбеке с покупки тарифа его рефералом.
+    async fn notify_referral_cashback(
+        &self,
+        referrer: &User,
+        friend: Option<PublicIdentity>,
+        amount: Money,
     ) -> DomainResult<()>;
 }

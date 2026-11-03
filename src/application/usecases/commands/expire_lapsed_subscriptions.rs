@@ -92,7 +92,10 @@ mod tests {
         subscription::{
             SubscriptionDevices, SubscriptionPlan, SubscriptionRepository, SubscriptionStatus,
         },
-        user::{ReferralCode, SubscriptionToken, TelegramId, User, UserId, UserRepository},
+        user::{
+            PublicIdentity, ReferralCode, SubscriptionToken, TelegramId, User, UserId,
+            UserRepository,
+        },
         vpn::VpnAccessRevoker,
     };
     use async_trait::async_trait;
@@ -129,6 +132,9 @@ mod tests {
             _token: &SubscriptionToken,
         ) -> DomainResult<Option<User>> {
             unreachable!("find_by_subscription_token() не используется в этом юзкейсе")
+        }
+        async fn find_by_referral_code(&self, _code: &ReferralCode) -> DomainResult<Option<User>> {
+            unreachable!("find_by_referral_code() не используется в этом юзкейсе")
         }
     }
 
@@ -224,6 +230,21 @@ mod tests {
             _code: &DeviceSetupCode,
         ) -> DomainResult<()> {
             unreachable!("notify_device_setup_code() не используется в этом юзкейсе")
+        }
+        async fn notify_referral_joined(
+            &self,
+            _referrer: &User,
+            _friend: Option<PublicIdentity>,
+        ) -> DomainResult<()> {
+            unreachable!("notify_referral_joined() не используется в этом юзкейсе")
+        }
+        async fn notify_referral_cashback(
+            &self,
+            _referrer: &User,
+            _friend: Option<PublicIdentity>,
+            _amount: Money,
+        ) -> DomainResult<()> {
+            unreachable!("notify_referral_cashback() не используется в этом юзкейсе")
         }
     }
 

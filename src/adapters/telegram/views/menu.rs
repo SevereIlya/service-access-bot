@@ -1,4 +1,8 @@
-use crate::adapters::telegram::{MessageView, UiText, build_menu_keyboard};
+use crate::adapters::telegram::{
+    MessageView, UiText, build_menu_keyboard, format_rub, format_rub_exact,
+};
+use crate::application::ReferralOverview;
+use crate::domain::billing::Money;
 use chrono::{DateTime, FixedOffset, Utc};
 use teloxide::types::{InlineKeyboardButton, InlineKeyboardMarkup};
 
@@ -73,9 +77,34 @@ pub fn build_refresh_menu_view(ui: &UiText, can_trial: bool) -> MessageView {
 }
 
 #[must_use]
-pub fn build_referral_view(ui: &UiText, bot_username: &str, referral_code: &str) -> MessageView {
+pub fn build_referral_view(
+    ui: &UiText,
+    bot_username: &str,
+    referral_code: &str,
+    overview: &ReferralOverview,
+) -> MessageView {
     let link = format!("https://t.me/{bot_username}?start={referral_code}");
-    let text = ui.message.msg_referral.replace("{link}", &link);
+    let text = ui
+        .message
+        .msg_referral
+        .replace("{link}", &link)
+        .replace("{welcome_bonus}", &format_rub(overview.welcome_bonus))
+        .replace("{cashback_percent}", &overview.cashback_percent.to_string())
+        .replace("{invited}", &overview.invited.to_string())
+        .replace("{earned}", &format_rub_exact(overview.earned));
+    let keyboard = InlineKeyboardMarkup::new(vec![vec![InlineKeyboardButton::callback(
+        ui.button.btn_menu_main.clone(),
+        "menu:main",
+    )]]);
+    MessageView { text, keyboard }
+}
+
+#[must_use]
+pub fn build_referral_welcome_message(ui: &UiText, welcome_bonus: Option<Money>) -> MessageView {
+    let text = welcome_bonus.map_or_else(
+        || ui.message.msg_referral_welcome.clone(),
+        |bonus| ui.message.msg_referral_welcome_bonus.replace("{bonus}", &format_rub(bonus)),
+    );
     let keyboard = InlineKeyboardMarkup::new(vec![vec![InlineKeyboardButton::callback(
         ui.button.btn_menu_main.clone(),
         "menu:main",

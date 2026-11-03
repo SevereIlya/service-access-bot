@@ -8,6 +8,7 @@ use uuid::Uuid;
 pub struct AppConfig {
     pub general: GeneralConfig,
     pub payments: PaymentsConfig,
+    pub referral: ReferralConfig,
     pub vpn: VpnConfig,
 }
 
@@ -29,6 +30,16 @@ pub struct PlategaConfig {
     pub success_url: String,
     pub failed_url: String,
     pub webhook_allowed_ip: Vec<IpAddr>,
+}
+
+// ==============================================================================================
+//                                    РЕФЕРАЛЬНАЯ ПРОГРАММА
+// ==============================================================================================
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct ReferralConfig {
+    pub welcome_bonus: i64,
+    pub cashback_percent: i32,
 }
 
 // ==============================================================================================

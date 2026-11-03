@@ -1,7 +1,10 @@
 use crate::domain::{
     DomainError, DomainResult, UserError,
     billing::Money,
-    user::{DiscountPercent, ReferralCode, SubscriptionToken, TelegramId, UserId, UserRole},
+    user::{
+        DiscountPercent, PublicIdentity, ReferralCode, SubscriptionToken, TelegramId, UserId,
+        UserRole,
+    },
 };
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
@@ -141,6 +144,19 @@ impl User {
         self.created_at
     }
 
+    /// Показываем `@username`, иначе имя.
+    /// `None` значит показывать нечего.
+    pub fn public_identity(&self) -> Option<PublicIdentity> {
+        let username = self.username.as_deref().map(str::trim).filter(|name| !name.is_empty());
+
+        if let Some(username) = username {
+            return Some(PublicIdentity::Username(username.to_owned()));
+        }
+
+        let name = self.full_name.trim();
+        (!name.is_empty()).then(|| PublicIdentity::Name(name.to_owned()))
+    }
+
     #[must_use]
     pub fn is_admin(&self) -> bool {
         self.role == UserRole::Admin
@@ -174,13 +190,13 @@ mod tests {
     // ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ
     // ==========================================
 
-    fn create_base_user() -> User {
+    fn create_user(username: Option<&str>, full_name: &str) -> User {
         User::new(
-            TelegramId::new(123456789),
+            TelegramId::new(123_456_789),
             Uuid::new_v4(),
-            Some("freddie".to_string()),
-            "Freddie Mercury".to_string(),
-            Money::new(20000).unwrap(),
+            username.map(str::to_owned),
+            full_name.to_owned(),
+            Money::new(20_000).unwrap(),
             ReferralCode::new("MY_REF_123".to_string()),
             SubscriptionToken::new("TOKEN_XYZ".to_string()),
         )
@@ -192,9 +208,9 @@ mod tests {
 
     #[test]
     fn test_user_new_creates_valid_default_user() {
-        let user = create_base_user();
+        let user = create_user(Some("freddie"), "Freddie Mercury");
         assert_eq!(user.id, None);
-        assert_eq!(user.telegram_id, TelegramId::new(123456789));
+        assert_eq!(user.telegram_id, TelegramId::new(123_456_789));
         assert_eq!(user.username, Some("freddie".to_string()));
         assert_eq!(user.full_name, "Freddie Mercury".to_string());
         assert_eq!(user.role, UserRole::User);
@@ -207,14 +223,14 @@ mod tests {
             user.subscription_token,
             SubscriptionToken::new("TOKEN_XYZ".to_string())
         );
-        assert_eq!(user.trial_used, false);
+        assert!(!user.trial_used);
         assert_eq!(user.discount_percent, DiscountPercent::zero());
     }
 
     #[test]
     fn test_restore_from_db_and_getters() {
         let id = UserId::new(42);
-        let tg_id = TelegramId::new(987654321);
+        let tg_id = TelegramId::new(987_654_321);
         let uuid = Uuid::new_v4();
         let username = Some("ivan_ivanov".to_string());
         let full_name = "Ivan Ivanov".to_string();
@@ -257,7 +273,7 @@ mod tests {
 
     #[test]
     fn test_assign_id_sets_correct_id() {
-        let mut user = create_base_user();
+        let mut user = create_user(Some("freddie"), "Freddie Mercury");
         assert_eq!(
             user.id(),
             None,
@@ -265,7 +281,7 @@ mod tests {
         );
 
         let new_id = UserId::new(777);
-        user.assign_id(new_id.clone());
+        user.assign_id(new_id);
 
         assert_eq!(
             user.id(),
@@ -276,7 +292,7 @@ mod tests {
 
     #[test]
     fn test_update_profile_changes_data_correctly() {
-        let mut user = create_base_user();
+        let mut user = create_user(Some("freddie"), "Freddie Mercury");
 
         assert_eq!(user.username(), Some("freddie".to_string()));
         assert_eq!(user.full_name(), "Freddie Mercury");
@@ -294,20 +310,20 @@ mod tests {
 
     #[test]
     fn test_use_trial_success() {
-        let mut user = create_base_user();
+        let mut user = create_user(Some("freddie"), "Freddie Mercury");
 
         assert_eq!(user.discount_percent, DiscountPercent::zero());
 
         let result = user.use_trial();
 
         assert!(result.is_ok());
-        assert_eq!(user.trial_used, true);
+        assert!(user.trial_used);
         assert_eq!(user.discount_percent, DiscountPercent::new(15).unwrap());
     }
 
     #[test]
     fn test_use_trial_fails_if_already_used() {
-        let mut user = create_base_user();
+        let mut user = create_user(Some("freddie"), "Freddie Mercury");
 
         user.trial_used = true;
 
@@ -322,10 +338,39 @@ mod tests {
 
     #[test]
     fn test_user_is_admin() {
-        let mut user = create_base_user();
-        assert_eq!(user.is_admin(), false);
+        let mut user = create_user(Some("freddie"), "Freddie Mercury");
+        assert!(!user.is_admin());
 
         user.role = UserRole::Admin;
-        assert_eq!(user.is_admin(), true);
+        assert!(user.is_admin());
+    }
+
+    #[test]
+    fn test_public_identity_prefers_username() {
+        assert_eq!(
+            create_user(Some("alice"), "Alice A").public_identity(),
+            Some(PublicIdentity::Username("alice".to_owned()))
+        );
+    }
+
+    #[test]
+    fn test_public_identity_falls_back_to_name() {
+        assert_eq!(
+            create_user(None, "Alice A").public_identity(),
+            Some(PublicIdentity::Name("Alice A".to_owned()))
+        );
+    }
+
+    #[test]
+    fn test_public_identity_ignores_blank_username() {
+        assert_eq!(
+            create_user(Some("  "), "Alice A").public_identity(),
+            Some(PublicIdentity::Name("Alice A".to_owned()))
+        );
+    }
+
+    #[test]
+    fn test_public_identity_is_none_when_nothing_to_show() {
+        assert_eq!(create_user(None, "   ").public_identity(), None);
     }
 }

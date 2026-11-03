@@ -8,6 +8,7 @@ use crate::domain::{
     billing::{DynPaymentGateway, DynTransactionRepository, Money},
     device::DynDeviceRepository,
     notification::DynNotifier,
+    referral::{DynReferralRepository, ReferralPolicy},
     subscription::DynSubscriptionRepository,
     uow::DynUnitOfWork,
     user::DynUserRepository,
@@ -29,6 +30,7 @@ pub struct UseCases {
     pub process_payment_webhook: Arc<ProcessPaymentWebhookCommand>,
     pub purchase_tariff: Arc<PurchaseTariffCommand>,
     pub register_device: Arc<RegisterDeviceCommand>,
+    pub apply_referral: Arc<ApplyReferralCommand>,
 
     pub get_menu_state: Arc<GetMenuStateQuery>,
     pub get_profile: Arc<GetProfileQuery>,
@@ -36,6 +38,7 @@ pub struct UseCases {
     pub get_user_by_subscription_token: Arc<GetUserBySubscriptionTokenQuery>,
     pub get_purchase_quote: Arc<GetPurchaseQuoteQuery>,
     pub get_stub_profile: Arc<GetStubProfileQuery>,
+    pub get_referral_overview: Arc<GetReferralOverviewQuery>,
 }
 
 impl UseCases {
@@ -52,6 +55,7 @@ impl UseCases {
         node_repo: DynNodeRepository,
         vpn_connection_repo: DynVpnConnectionRepository,
         transaction_repo: DynTransactionRepository,
+        referral_repo: DynReferralRepository,
         uow: DynUnitOfWork,
         vpn_revoker: DynVpnAccessRevoker,
         vpn_provisioner: DynVpnProvisioner,
@@ -60,6 +64,7 @@ impl UseCases {
         notifier: DynNotifier,
         uuid_namespace: Uuid,
         base_price: Money,
+        referral_policy: ReferralPolicy,
     ) -> Self {
         // === Commands ===
         let register_user = Arc::new(
@@ -114,14 +119,23 @@ impl UseCases {
         );
         let purchase_tariff = Arc::new(
             PurchaseTariffCommand::new(
-                uow
+                uow.clone(),
+                notifier.clone(),
+                referral_policy,
             )
         );
         let register_device = Arc::new(
             RegisterDeviceCommand::new(
                 subscription_repo.clone(),
-                device_repo,
-                notifier
+                device_repo.clone(),
+                notifier.clone(),
+            )
+        );
+        let apply_referral = Arc::new(
+            ApplyReferralCommand::new(
+                uow,
+                notifier,
+                referral_policy,
             )
         );
 
@@ -138,7 +152,9 @@ impl UseCases {
         );
         let get_profile = Arc::new(
             GetProfileQuery::new(
-                subscription_repo
+                subscription_repo,
+                transaction_repo.clone(),
+                device_repo
             )
         );
         let get_user_by_subscription_token = Arc::new(
@@ -148,12 +164,19 @@ impl UseCases {
         );
         let get_purchase_quote = Arc::new(
             GetPurchaseQuoteQuery::new(
-                transaction_repo
+                transaction_repo.clone()
             )
         );
         let get_stub_profile = Arc::new(
             GetStubProfileQuery::new(
                 config_generator,
+            )
+        );
+        let get_referral_overview = Arc::new(
+            GetReferralOverviewQuery::new(
+                referral_repo,
+                transaction_repo,
+                referral_policy,
             )
         );
 
@@ -167,12 +190,14 @@ impl UseCases {
             process_payment_webhook,
             purchase_tariff,
             register_device,
+            apply_referral,
             get_menu_state,
             get_profile,
             get_user_by_telegram_id,
             get_user_by_subscription_token,
             get_purchase_quote,
             get_stub_profile,
+            get_referral_overview,
         }
     }
 }

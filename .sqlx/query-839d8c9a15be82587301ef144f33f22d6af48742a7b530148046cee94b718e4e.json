@@ -1,0 +1,64 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT *\n            FROM referrals\n            WHERE referred_id = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "referrals",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "referrer_id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "referrals",
+            "name": "referrer_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "referred_id",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "referrals",
+            "name": "referred_id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "referrals",
+            "name": "created_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "839d8c9a15be82587301ef144f33f22d6af48742a7b530148046cee94b718e4e"
+}

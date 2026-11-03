@@ -9,7 +9,10 @@ CREATE TABLE transactions
     order_id         TEXT        NOT NULL UNIQUE,
     provider_tx_id   TEXT UNIQUE,
     payload          JSONB,
-    created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT transactions_kind_valid CHECK (
+        kind IN ('top_up', 'purchase', 'referral_cashback', 'referral_welcome_bonus', 'refund')
+        )
 );
 
 CREATE INDEX idx_transactions_user_id ON transactions (user_id) WHERE status = 'success';

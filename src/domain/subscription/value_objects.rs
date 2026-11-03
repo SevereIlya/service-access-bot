@@ -209,7 +209,7 @@ mod tests {
 
         match result.unwrap_err() {
             DomainError::Subscription(SubscriptionError::InvalidPlan(plan)) => {
-                assert_eq!(plan, "forever")
+                assert_eq!(plan, "forever");
             }
             _ => panic!("Ожидалась ошибка SubscriptionError::InvalidPlan"),
         }
@@ -251,7 +251,7 @@ mod tests {
 
         match result.unwrap_err() {
             DomainError::Subscription(SubscriptionError::InvalidStatus(status)) => {
-                assert_eq!(status, "banned")
+                assert_eq!(status, "banned");
             }
             _ => panic!("Ожидалась ошибка SubscriptionError::InvalidStatus"),
         }
@@ -260,9 +260,9 @@ mod tests {
     // --- SubscriptionDevices ---
     #[test]
     fn test_subscription_devices_valid() {
-        let dev_min = SubscriptionDevices::new(1).unwrap();
-        assert_eq!(dev_min.inner(), 1);
-        assert_eq!(dev_min.to_string(), "1");
+        let dev_minx = SubscriptionDevices::new(1).unwrap();
+        assert_eq!(dev_minx.inner(), 1);
+        assert_eq!(dev_minx.to_string(), "1");
 
         let dev_mid = SubscriptionDevices::new(5).unwrap();
         assert_eq!(dev_mid.inner(), 5);
@@ -277,7 +277,7 @@ mod tests {
         assert!(result_under.is_err());
         match result_under.unwrap_err() {
             DomainError::Subscription(SubscriptionError::InvalidDevices(val)) => {
-                assert_eq!(val, 0)
+                assert_eq!(val, 0);
             }
             _ => panic!("Ожидалась ошибка SubscriptionError::InvalidDevices"),
         }
@@ -286,7 +286,7 @@ mod tests {
         assert!(result_over.is_err());
         match result_over.unwrap_err() {
             DomainError::Subscription(SubscriptionError::InvalidDevices(val)) => {
-                assert_eq!(val, 11)
+                assert_eq!(val, 11);
             }
             _ => panic!("Ожидалась ошибка SubscriptionError::InvalidDevices"),
         }

@@ -81,7 +81,7 @@ mod tests {
 
     fn create_test_user(use_trial: bool, id: Option<UserId>) -> User {
         let mut user = User::new(
-            TelegramId::new(123456789),
+            TelegramId::new(123_456_789),
             Uuid::new_v4(),
             None,
             "John Doe".to_string(),
