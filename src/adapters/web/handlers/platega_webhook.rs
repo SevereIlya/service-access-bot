@@ -21,7 +21,7 @@ pub async fn handle_platega_webhook(
         .and_then(|v| v.to_str().ok())
         .and_then(|s| s.parse::<IpAddr>().ok());
 
-    let allowed_ips = &state.config.payments.platega.webhook_allowed_ip;
+    let allowed_ips = &state.webhook_allowed_ips;
 
     if !real_ip.is_some_and(|ip| allowed_ips.contains(&ip)) {
         error!(?real_ip, expected = ?allowed_ips, "Вебхук Платеги с левого IP");

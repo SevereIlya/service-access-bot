@@ -163,7 +163,7 @@ impl AppState {
 
         let web_state = WebState {
             usecases,
-            config: config.clone(),
+            webhook_allowed_ips: config.payments.platega.webhook_allowed_ip.as_slice().into(),
             stub_text,
         };
 

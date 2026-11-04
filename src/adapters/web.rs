@@ -1,6 +1,6 @@
 use crate::adapters::StubText;
 use crate::application::UseCases;
-use crate::infrastructure::AppConfig;
+use std::net::IpAddr;
 use std::sync::Arc;
 
 pub mod error;
@@ -14,6 +14,6 @@ pub use router::*;
 #[derive(Clone)]
 pub struct WebState {
     pub usecases: Arc<UseCases>,
-    pub config: Arc<AppConfig>,
+    pub webhook_allowed_ips: Arc<[IpAddr]>,
     pub stub_text: Arc<StubText>,
 }
