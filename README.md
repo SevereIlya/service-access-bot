@@ -1,68 +1,197 @@
-# Telegram Subscription Management Backend
+# Subscription Access Bot
 
-A production-grade, highly scalable asynchronous backend for Telegram bots built with Rust.
+A Telegram bot with a web backend that runs a subscription service end to end: onboarding and trials, tariffs, wallet
+top-ups through a payment gateway, a referral program, per-device access control, and automated access provisioning.
 
-This repository serves as a portfolio showcase of advanced software engineering patterns. It demonstrates how to build robust, maintainable, and strictly typed systems using modern architectural principles, avoiding the common pitfalls of tight coupling and anemic domain models.
+It is deployed to production and used by real people. This repository is a **portfolio project**: its goal is to show
+how I design and build a Rust service.
 
-*Note: Proprietary business logic and specific integrations have been abstracted into generic interfaces to protect commercial interests, while the core architectural skeleton remains fully intact.*
+> Secrets, production configuration, user-facing copy and the client profile template are intentionally not part of the
+> repository. The `*.example` files show their shape.
 
-## Architectural Overview
+## What it does
 
-This project strictly adheres to **Clean Architecture** and **Domain-Driven Design (DDD)** principles. The codebase is organized into four distinct layers, with dependencies strictly pointing inward toward the Domain.
+- **Onboarding and trials:** registers users on `/start`, keeps their Telegram identity fresh, and grants a one-time
+  trial.
+- **Tariffs:** the price is a pure domain function of plan duration, device count and the user's frozen base price.
+- **Wallet and payments:** top-ups go through an external payment gateway; all money movement is recorded in an
+  append-only ledger.
+- **Access provisioning:** provisions and updates user access through an external management API and serves personal
+  subscription links generated from a template.
+- **Device control:** enforces the per-subscription device limit and tells the user how to connect a new device.
+- **Referral program:** a welcome bonus for the invited user and percentage cashback for the referrer on every tariff
+  purchase.
+- **Lifecycle automation:** an hourly scheduler revokes lapsed subscriptions and tracks expiry-warning delivery using
+  persisted state.
+- **Operations:** `ERROR` logs are forwarded to an admin chat, migrations run on startup, and the whole thing ships as a
+  Docker-built binary.
+
+## Architecture
+
+The project follows **Clean Architecture**, **Domain-Driven Design** and **CQRS** principles with dependency inversion.
+Inbound adapters handle external requests and invoke application use cases, while the domain layer defines the business
+rules and abstractions. Infrastructure components and outbound adapters provide concrete implementations of these
+abstractions. Dependencies are wired at startup through a dedicated composition root.
+
+```mermaid
+flowchart LR
+    subgraph ADAPTERS["Adapters"]
+        direction TB
+
+        subgraph INBOUND["Inbound Adapters"]
+            direction TB
+            TG["Telegram Bot"]
+            WEB["HTTP Interface"]
+            SCH["Scheduler"]
+        end
+
+        subgraph OUTBOUND["Outbound Adapters"]
+            direction TB
+            NOTIFIER["Notification Adapter"]
+        end
+    end
+
+    subgraph APP["Application"]
+        UC["Use Cases<br/>Commands · Queries"]
+    end
+
+    subgraph DOM["Domain"]
+        direction TB
+        MODEL["Entities & Value Objects"]
+        RULES["Policies & Business Rules"]
+        PORTS["Ports & Contracts<br/>Repositories · Unit of Work<br/>External Service Interfaces"]
+    end
+
+    subgraph INF["Infrastructure"]
+        direction TB
+        DB["Persistence"]
+        PAYMENT["Payment Integration"]
+        EXTERNAL["External Integrations"]
+    end
+
+    BOOT["Bootstrap<br/>Composition Root"]
+    TG -->|invokes| UC
+    WEB -->|invokes| UC
+    SCH -->|triggers| UC
+    UC -.->|depends on| MODEL
+    UC -.->|depends on| RULES
+    UC -.->|depends on| PORTS
+    NOTIFIER -.->|implements| PORTS
+    DB -.->|implements| PORTS
+    PAYMENT -.->|implements| PORTS
+    EXTERNAL -.->|implements| PORTS
+    BOOT -.->|assembles| UC
+    BOOT -.->|configures| TG
+    BOOT -.->|configures| WEB
+    BOOT -.->|instantiates| DB
+    BOOT -.->|instantiates| PAYMENT
+    BOOT -.->|instantiates| EXTERNAL
+    BOOT -.->|instantiates| NOTIFIER
+```
 
 ```text
 src/
-├── adapters/       # Delivery mechanisms: Telegram framework integration, UI views, routing.
-├── application/    # Orchestration layer: Use cases (Commands/Queries) and transaction boundaries.
-├── domain/         # Core business logic: Entities, Value Objects, Domain Errors.
-└── infrastructure/ # External concerns: PostgreSQL connections, SQLx, Configuration, DI Container.
+├── adapters/        # Telegram (handlers, callbacks, views), web (axum), scheduler
+├── application/     # Use cases: commands (write side) and queries (read side)
+├── domain/          # Entities, value objects, ports, business rules; no I/O
+├── infrastructure/  # PostgreSQL (SQLx), payment gateway, external integration client, config
+└── bootstrap.rs     # Composition root: builds and wires everything
 ```
 
-## Core Engineering Patterns
+The domain model covers the following business areas and supporting abstractions:
 
-### 1. Domain-Driven Design (DDD)
-*   **Rich Domain Models:** Business rules (e.g., trial eligibility, discount processing) are encapsulated directly within Domain Entities (`User`, `Subscription`). State mutation is strictly controlled via domain methods; properties are private to prevent invalid states.
-*   **Value Objects (Newtype Pattern):** Extensive use of domain primitives (`UserId`, `TelegramId`, `Money`, `SubscriptionPlan`) to leverage Rust's type system, preventing logic errors and invalid comparisons at compile time.
-*   **Reconstitution Pattern:** Entities utilize isolated `restore_from_db` constructors used strictly by the Infrastructure layer mapping, ensuring business invariants are not bypassed during data retrieval.
+| Area         | Responsibility                                                                |
+|--------------|-------------------------------------------------------------------------------|
+| User         | Identity, trial eligibility, referral code, public identity for notifications |
+| Subscription | Plans, device limits, lifecycle, renewal                                      |
+| Billing      | Money, append-only ledger, pricing, payment gateway port                      |
+| Access       | Access lifecycle, connection management, provisioning contracts               |
+| Device       | Device registry, client identification, access decisions                      |
+| Referral     | Referral links, bonus and cashback policies, invariants                       |
+| Notification | Outbound notification port                                                    |
+| Unit of Work | Transactional repository access                                               |
 
-### 2. CQRS (Command and Query Responsibility Segregation)
-Application logic is divided into isolated `Commands` (state-mutating operations) and `Queries` (read-only operations). This eliminates bloated service classes and allows independent scaling and testing of read and write paths.
+## Engineering decisions worth a look
 
-### 3. Unit of Work (UoW)
-A custom UoW implementation manages transaction boundaries across multiple PostgreSQL repositories. By abstracting `sqlx::Transaction` behind a `tokio::sync::Mutex`, the Domain and Application layers can execute atomic operations safely in an asynchronous environment without being coupled to the underlying database driver.
+**1. A domain that protects itself.** Entities keep their fields private and change state only through methods that
+enforce invariants. Value objects (`Money`, `TelegramId`, `ReferralCode`, `SubscriptionDevices`, ...) validate on
+construction, so a negative balance or a malformed code cannot exist past the boundary. Persisted rows become entities
+again through dedicated reconstitution constructors (`restore_from_db`), so the rules are not bypassed on load. See
+`src/domain/`.
 
-### 4. Advanced Database Design
-*   **Internal vs. External Keys:** The database utilizes `BIGINT` identity columns as Primary Keys for highly optimized internal joins, while exposing `UUID` (External IDs) for secure API integrations and third-party interactions.
-*   **Slowly Changing Dimensions (SCD):** Financial integrity is guaranteed by snapshotting base prices (`frozen_base_price`) at the time of user registration, ensuring historical data remains consistent regardless of future pricing changes.
-*   **Zero-Cost Compile-Time Queries:** Heavy reliance on `sqlx` macros ensures that all SQL queries are verified against the active database schema during compilation.
+**2. CQRS without ceremony.** Every use case is its own struct with a single `execute`. Commands mutate state, queries
+only read (a price quote, for example, never touches the database state). One `UseCases` container is built once in the
+composition root. See `src/application/usecases/`.
 
-### 5. Observability & Structured Logging
-The project implements rigorous structured logging using the `tracing` crate. Logs are strictly separated by severity levels. `#[instrument]` macros are used at the Adapter layer to automatically inject user context (e.g., `telegram_id`) into the span, ensuring complete request traceability across all application layers without polluting the domain logic.
+**3. A Unit of Work that keeps the ports clean.** Repositories are trait objects that behave the same on the connection
+pool and inside a transaction. The transaction sits behind `Arc<tokio::sync::Mutex<Option<Transaction>>>`, so no
+lifetimes leak into the domain traits; the price is that a context must not be used concurrently, which the use cases
+respect by querying sequentially. The `in_transaction!` macro guarantees a commit on success and a rollback on every
+error path. See `src/macros.rs` and `src/infrastructure/database/uow.rs`.
 
-### 6. Dependency Injection
-Infrastructure layers (Repositories, UoW) are instantiated in a central Composition Root (`AppState` container) and injected into the Application layer via `Arc`. This ensures the business logic remains 100% testable using mock repositories without requiring a live database connection.
+**4. A ledger instead of a balance column.** Money moves through an append-only `transactions` table: amounts are always
+positive (`CHECK (amount > 0)`), the direction comes from the transaction kind, and the balance is computed with `SUM`
+in the query, so there is no second source of truth to drift. Unique constraints on `order_id` and the provider
+transaction ID prevent duplicate records and support idempotent processing. A purchase debits the wallet, creates or
+renews the subscription and credits the referrer's cashback in one atomic transaction. See `src/domain/billing/` and
+`src/application/usecases/commands/purchase_tariff.rs`.
 
-## Technology Stack
+**5. A webhook is a hint, not a fact.** The payment gateway does not sign its callbacks, so the handler treats an
+incoming webhook only as a trigger: the source address is checked against an allowlist, then the transaction status is
+fetched from the gateway's API, and only that response changes the ledger. See `src/adapters/web/`.
 
-*   **Language:** Rust (Stable)
-*   **Async Runtime:** Tokio
-*   **Database:** PostgreSQL
-*   **Database Toolkit:** SQLx
-*   **Telegram Framework:** Teloxide
-*   **Observability:** Tracing, Tracing-Subscriber
-*   **Configuration:** Config (TOML based)
+**6. No network calls inside database transactions.** External provisioning deliberately runs outside any DB
+transaction: holding a connection while waiting for an external API starves the pool and cannot be rolled back anyway.
+Instead, provisioning is idempotent and reconciles partial results of the remote management API. See
+`src/application/usecases/commands/` and `src/infrastructure/`.
 
-## Local Development
+**7. Let the database settle races.** Uniqueness and invariants live in constraints (`UNIQUE (referred_id)`,
+`CHECK (referrer_id <> referred_id)`, one active subscription per user), and unique-violation errors are translated into
+domain outcomes instead of check-then-insert logic in the application. Expiry warnings use a persisted `is_warning_sent`
+flag rather than time windows, making the process resilient to restarts and avoiding routine duplicate notifications.
 
-While this repository acts primarily as a codebase showcase, it is fully functional.
+**8. Exhaustive access decisions.** Whether an access request is granted, redirected to an onboarding
+step, or refused is decided in one use case that returns an exhaustive `DeviceAccess` enum. The web adapter only maps
+each variant to a response, so the compiler flags any unhandled case. Request classification and the allowlist of
+supported client types live in the domain. See `src/domain/device/` and
+`src/application/usecases/commands/register_device.rs`.
 
-To run the environment locally:
-1. Provide a PostgreSQL database and a Telegram Bot token.
-2. Copy `.env.example` to `.env`, `config.example.toml` to `config.toml` and `en.example.toml` to `en.toml`
-3. Apply database migrations: `cargo sqlx migrate run`.
-4. Run the test suite: `cargo test`.
-5. Start the backend: `cargo run`.
+**9. Built to be operated.** A custom `tracing` layer forwards `ERROR` events to an admin Telegram chat (deduplicated by
+call site), so failures reach me without watching logs. Secrets are redacted in manual `Debug` implementations.
+Migrations are embedded into the binary and applied on startup. The Docker build is multi-stage (cargo-chef) and
+compiles with SQL checks done offline from the committed `.sqlx` data. See `src/adapters/telegram/alerts.rs` and
+`Dockerfile`.
+
+## Testing and code quality
+
+- 240 automated tests. Domain and application layers are covered by fast unit tests that need no database, using
+  handwritten in-memory fakes instead of a mocking framework.
+- Repository code is verified with `#[sqlx::test]` integration tests (device repository so far). Extending this to the
+  remaining repositories, plus contract tests for the external integration clients, is the main known gap.
+- `clippy::pedantic` and `clippy::nursery` are enabled project-wide; lint exceptions use
+  `#[expect(..., reason = "...")]`.
+- SQL queries are validated using SQLx macros and schema-derived metadata.
+- A test verifies that every placeholder in the localization file matches what the code substitutes.
+
+## Tech stack
+
+Rust (edition 2024, stable) · Tokio · Teloxide · Axum · SQLx · PostgreSQL · Reqwest · Tracing · Serde, TOML · Thiserror,
+Anyhow, Strum · Docker
+
+## Development notes
+
+- The Rust toolchain is pinned in `rust-toolchain.toml`. SQLx query metadata is committed, allowing query validation
+  without a live database (`SQLX_OFFLINE=true`).
+- PostgreSQL is required for integration tests (`#[sqlx::test]`). Database migrations are applied automatically on
+  startup.
+- Running the service requires valid Telegram credentials and configuration for external integrations. Production
+  configuration and client-specific templates are intentionally excluded.
 
 ## License
 
-This project is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0). See the `LICENSE` file for details.
+Licensed under the GNU Affero General Public License v3.0 (AGPL-3.0). See [`LICENSE`](LICENSE).
+
+## Contact
+
+If you are hiring, or reviewing this code and want to talk about it, message me on
+Telegram: [@SevereILya](https://t.me/SevereILya)
